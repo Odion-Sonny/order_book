@@ -1,7 +1,13 @@
 from django.db import models
 from django.utils import timezone
+from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
+
+# The trader class is a subclass of the AbstractUser class and it will be used to represent the traders that will be using the trading engine.
+class Trader(AbstractUser):
+    pass
+
 
 # Asset basically mean each stock  or commodity that will be represented in the orderbook.
 class Asset(models.Model):
@@ -27,3 +33,10 @@ class Order(models.Model):
 class OrderBook(models.Model):
     asset = models.OneToOneField(Asset, on_delete=models.CASCADE)
     # other fields like exchange, status may be needed.
+
+class Trade(models.Model):
+    asset = models.ForeignKey(Asset, on_delete=models.CASCADE)
+    price = models.DecimalField(max_digits=15, decimal_places=2)
+    size = models.DecimalField(max_digits=15, decimal_places=2)
+    timestamp = models.DateTimeField(default=timezone.now)
+    # other fields like buyer, seller, order_id may be needed.
