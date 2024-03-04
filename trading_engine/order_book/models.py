@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 # Create your models here.
 
@@ -19,7 +20,8 @@ class Order(models.Model):
     price = models.DecimalField(max_digits=15, decimal_places=2)
     size = models.DecimalField(max_digits=15, decimal_places=2)
     order_type = models.CharField(max_length=20, choices=ORDER_TYPES)
-    # other fields like user & timestamp will be needed to know whose order to execute first
+    timestamp = models.DateTimeField(default=timezone.now)
+    # other fields like user will be needed to know whose order is being executed.
 
 # This is the core of the trading engine and it symbolizes where all orders are executed.
 class OrderBook(models.Model):
