@@ -1,16 +1,41 @@
 from django.db import models
 from django.utils import timezone
-from django.contrib.auth.models import AbstractUser
+from django.utils.translation import gettext_lazy as _
 
 # Create your models here.
 
-class Trader(AbstractUser):
+class Trader(models.Model):
     """
     Represents a trader that will be using the trading engine.
     Inherits from the AbstractUser class.
     """
+    class Meta(object):
+        app_label = "order_book"
 
-    pass
+    username = models.CharField(max_length=200, unique=True)
+    email = models.EmailField(max_length=255, unique=True)
+    password = models.CharField(max_length=200)
+    first_name = models.CharField(max_length=150)
+    middle_name = models.CharField(max_length=150)
+    last_name = models.CharField(max_length=150)
+    is_email_verified = models.BooleanField(_("is_email_verified"), default=False)
+    email_verified_at = models.DateTimeField(
+        _("email_verified_at"), blank=True, null=True
+    )
+
+    USERNAME_FIELD = "email"
+    REQUIRED_FIELDS = ["username", "first_name", "middle_name", "last_name"]
+
+    def fullname(self):
+        return f"{self.last_name} {self.first_name}"
+
+    def save(self, *args, **kwargs):
+        if not self.pk:
+            self.user_type = self.base_type
+            return super().save(*args, **kwargs)
+
+    def __str__(self):
+        return f"<User {self.email}> <Id {self.pk}>"
 
 
 class Asset(models.Model):
