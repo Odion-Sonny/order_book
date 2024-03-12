@@ -1,15 +1,12 @@
 from django.contrib import admin
-from .models import (Trader, Asset, Order, OrderBook, Trade)
+from .models import (Order, Asset)
 
 
 # Register your models here.
 admin.site.register(
     [
-        Trader,
-        Asset,
         Order,
-        OrderBook,
-        Trade
+        Asset
     ]
 )
 
