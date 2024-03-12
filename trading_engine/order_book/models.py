@@ -4,14 +4,18 @@ from django.contrib.auth.models import User
 
 # Create your models here.
 
-# Asset basically mean each stock  or commodity that will be represented in the orderbook.
 class Asset(models.Model):
+    """
+    Represents an asset, such as a stock or commodity, that will be represented in the order book.
+    """
     name = models.CharField(max_length=100)
     ticker = models.CharField(max_length=10)
     # other fields like description may be needed.
 
-# The Order class defines the properties of a order and how it will be executed  by the matching engine.
 class Order(models.Model):
+    """
+    Represents an order and defines its properties and how it will be executed by the matching engine.
+    """
     ORDER_TYPES = [
         ('LIMIT', 'Limit'),
         ('MARKET', 'Market'),
@@ -25,8 +29,10 @@ class Order(models.Model):
     timestamp = models.DateTimeField(default=timezone.now)
     # other fields like user will be needed to know whose order is being executed.
 
-# This is the core of the trading engine and it symbolizes where all orders are executed.
 class OrderBook(models.Model):
+    """
+    Represents the core of the trading engine where all orders are executed.
+    """
     order = models.ForeignKey(Order, on_delete=models.CASCADE)
     asset = models.OneToOneField(Asset, on_delete=models.CASCADE)
     # other fields like exchange, status may be needed.
