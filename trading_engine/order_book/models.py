@@ -21,12 +21,18 @@ class Order(models.Model):
         ('MARKET', 'Market'),
         ('STOP_LOSS', 'Stop Loss'),
     ]
+    STATUS = [
+        ('PENDING', 'Pending'),
+        ('EXECUTED', 'Executed'),
+        ('CANCELLED', 'Cancelled'),
+    ]
     user = models.ForeignKey(User, on_delete=models.CASCADE)
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=15, decimal_places=2)
     size = models.DecimalField(max_digits=15, decimal_places=2)
     order_type = models.CharField(max_length=20, choices=ORDER_TYPES)
     timestamp = models.DateTimeField(default=timezone.now)
+    status = models.CharField(max_length=20, choices=STATUS)
     # other fields like user will be needed to know whose order is being executed.
 
 class OrderBook(models.Model):
