@@ -33,7 +33,7 @@ class Order(models.Model):
         ('MARKET', 'Market'),
         ('STOP_LOSS', 'Stop Loss'),
     ]
-    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    user = models.ForeignKey(AbstractUser, on_delete=models.CASCADE)
     asset = models.ForeignKey(Asset, on_delete=models.CASCADE)
     price = models.DecimalField(max_digits=15, decimal_places=2)
     size = models.DecimalField(max_digits=15, decimal_places=2)

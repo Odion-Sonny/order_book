@@ -11,6 +11,14 @@ https://docs.djangoproject.com/en/4.2/ref/settings/
 """
 
 from pathlib import Path
+import environ
+
+env = environ.Env()
+environ.Env.read_env()
+
+ALPACA_API_KEY = env("ALPACA_API_KEY")
+ALPACA_SECRET_KEY = env("ALPACA_SECRET_KEY")
+ALPACA_BASE_URL = env("ALPACA_BASE_URL")
 
 # Build paths inside the project like this: BASE_DIR / 'subdir'.
 BASE_DIR = Path(__file__).resolve().parent.parent
@@ -37,6 +45,7 @@ INSTALLED_APPS = [
     'django.contrib.sessions',
     'django.contrib.messages',
     'django.contrib.staticfiles',
+    'order_book',
 ]
 
 MIDDLEWARE = [
