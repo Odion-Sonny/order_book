@@ -1,3 +1,7 @@
 venv/
 /trading_engine/db.sqlite3
 TrEng/
+<<<<<<< HEAD
+=======
+.env
+>>>>>>> b193d11 (setting up API keys)
