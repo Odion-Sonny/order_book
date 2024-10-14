@@ -1,11 +1,12 @@
+import sys
+import os
 from django.test import TestCase
-from ..trading_engine.settings import 
+
+sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 # Import necessary ALPACA libraries
-from alpaca.data.historical import StockHistoricalDataClient
+from trading_engine import settings
 from alpaca.trading.client import TradingClient
-from alpaca.trading.requests import GetCalendarRequest
-
 
 # Create your tests here.
 class TestAPIAccount(TestCase):
@@ -15,7 +16,8 @@ class TestAPIAccount(TestCase):
     try:
         account = trading_client.get_account()
         print("API is working. Account details:")
-        print(f"ID: {account.account_id}")
+        print(f"ID: {account.id}")
+        print(f"Buying Power: {account.buying_power}")
         print(f"Cash: {account.cash}")
         print(f"Status: {account.status}")
     except Exception as e:
