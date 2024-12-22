@@ -8,7 +8,7 @@ sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from trading_engine import settings
 from alpaca.trading.client import TradingClient
 
-# Create your tests here.
+# Testing connectivivity to API
 class TestAPIAccount(TestCase):
     trading_client = TradingClient(settings.ALPACA_API_KEY, settings.ALPACA_SECRET_KEY, )
 
@@ -22,3 +22,4 @@ class TestAPIAccount(TestCase):
         print(f"Status: {account.status}")
     except Exception as e:
         print(f"Failed to fetch account info. Error: {e}")
+        print("Possible errors with API key and API secret key.")
