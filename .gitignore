@@ -1,7 +1,16 @@
 venv/
 /trading_engine/db.sqlite3
 TrEng/
-<<<<<<< HEAD
-=======
 .env
->>>>>>> b193d11 (setting up API keys)
+*.pyc
+__pycache__/
+
+# SSL certificates
+/trading_engine/ssl/
+
+# Frontend build and dependencies
+/frontend/node_modules/
+/frontend/build/
+frontend/.env.development
+trading_engine/django.log
+.gitignore
