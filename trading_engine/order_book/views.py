@@ -286,6 +286,8 @@ def trades_list(request):
         assets = Asset.objects.all()
         
         if assets:
+            # Generate trades with sequential timestamps (newest first)
+            base_time = timezone.now()
             for i in range(15):
                 asset = random.choice(assets)
                 # Get current market price
@@ -299,9 +301,10 @@ def trades_list(request):
                 price_variation = random.uniform(-0.02, 0.02)  # ±2%
                 trade_price = base_price * (1 + price_variation)
                 
-                # Generate timestamp with slight variation for realism
-                time_offset = random.randint(0, 300)  # Random seconds in past 5 minutes
-                trade_time = timezone.now() - timezone.timedelta(seconds=time_offset)
+                # Generate sequential timestamps (newest first)
+                # Each trade is 15-45 seconds older than the previous one
+                seconds_back = sum([random.randint(15, 45) for _ in range(i + 1)])
+                trade_time = base_time - timezone.timedelta(seconds=seconds_back)
                 
                 sample_trades.append({
                     'id': f"trade_{i+1}_{int(trade_time.timestamp())}",
