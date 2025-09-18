@@ -69,7 +69,7 @@ const PlaceOrder: React.FC = () => {
   };
 
   return (
-    <Box sx={{ p: 3 }}>
+    <div style={{ padding: '24px' }}>
       <Typography variant="h4" gutterBottom>
         Place Order
       </Typography>
@@ -153,7 +153,7 @@ const PlaceOrder: React.FC = () => {
           {status.message}
         </Alert>
       )}
-    </Box>
+    </div>
   );
 };
 

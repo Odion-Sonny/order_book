@@ -8,7 +8,6 @@ import {
   TableHead,
   TableRow,
   Typography,
-  Box,
   CircularProgress,
   Chip,
   Grid,
@@ -68,19 +67,19 @@ const TradeHistory: React.FC = () => {
 
   if (loading) {
     return (
-      <Box display="flex" justifyContent="center" alignItems="center" minHeight="400px">
+      <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '400px' }}>
         <CircularProgress />
-      </Box>
+      </div>
     );
   }
 
   return (
-    <Box sx={{ p: 3 }}>
-      <Box display="flex" justifyContent="space-between" alignItems="center" mb={2}>
+    <div style={{ padding: '24px' }}>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '16px' }}>
         <Typography variant="h4" gutterBottom>
           Trade History
         </Typography>
-        <Box display="flex" alignItems="center" gap={1}>
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
           <Chip 
             label="LIVE" 
             color="success"
@@ -92,17 +91,17 @@ const TradeHistory: React.FC = () => {
               Last update: {lastUpdate.toLocaleTimeString()}
             </Typography>
           )}
-        </Box>
-      </Box>
+        </div>
+      </div>
       
       {error && (
-        <Box mb={2}>
+        <div style={{ marginBottom: '16px' }}>
           <Chip label={error} color="error" />
-        </Box>
+        </div>
       )}
 
       {/* Trading Activity Summary */}
-      <Box mb={3}>
+      <div style={{ marginBottom: '24px' }}>
         <Grid container spacing={2}>
           <Grid item xs={12} sm={6} md={3}>
             <Paper sx={{ p: 2, textAlign: 'center' }}>
@@ -145,32 +144,27 @@ const TradeHistory: React.FC = () => {
             </Paper>
           </Grid>
         </Grid>
-      </Box>
+      </div>
 
-      <Box mb={2} display="flex" justifyContent="space-between" alignItems="center">
+      <div style={{ marginBottom: '16px', display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Typography variant="h6">
           Live Order Executions
         </Typography>
-        <Box display="flex" alignItems="center" gap={1}>
-          <Box
-            sx={{
-              width: 8,
-              height: 8,
+        <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+          <div
+            style={{
+              width: '8px',
+              height: '8px',
               borderRadius: '50%',
               backgroundColor: '#4CAF50',
               animation: 'pulse 2s infinite',
-              '@keyframes pulse': {
-                '0%': { opacity: 1 },
-                '50%': { opacity: 0.3 },
-                '100%': { opacity: 1 },
-              },
             }}
           />
           <Typography variant="caption" color="text.secondary">
             Updates every 2 seconds
           </Typography>
-        </Box>
-      </Box>
+        </div>
+      </div>
       
       <TableContainer component={Paper} sx={{ maxHeight: '600px', overflow: 'auto' }}>
         <Table stickyHeader>
@@ -204,30 +198,25 @@ const TradeHistory: React.FC = () => {
                     }}
                   >
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         {isRecent && (
-                          <Box
-                            sx={{
-                              width: 8,
-                              height: 8,
+                          <div
+                            style={{
+                              width: '8px',
+                              height: '8px',
                               borderRadius: '50%',
                               backgroundColor: isBuy ? '#4CAF50' : '#f44336',
                               animation: 'pulse 2s infinite',
-                              '@keyframes pulse': {
-                                '0%': { opacity: 1 },
-                                '50%': { opacity: 0.5 },
-                                '100%': { opacity: 1 },
-                              },
                             }}
                           />
                         )}
                         <Typography variant="body2">
                           {tradeTime.toLocaleTimeString()}
                         </Typography>
-                      </Box>
+                      </div>
                     </TableCell>
                     <TableCell>
-                      <Box display="flex" alignItems="center" gap={1}>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                         <Typography 
                           sx={{ 
                             fontWeight: 'bold',
@@ -249,7 +238,7 @@ const TradeHistory: React.FC = () => {
                             }}
                           />
                         )}
-                      </Box>
+                      </div>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -307,7 +296,7 @@ const TradeHistory: React.FC = () => {
           </TableBody>
         </Table>
       </TableContainer>
-    </Box>
+    </div>
   );
 };
 
