@@ -17,26 +17,57 @@ class AssetViewSet(viewsets.ModelViewSet):
     
     @action(detail=False, methods=['get'])
     def market_data(self, request):
-        """Get market data for all assets"""
+        """Get real-time market data for all assets from Alpaca"""
         assets = Asset.objects.all()
         symbols = [asset.ticker for asset in assets]
         
-        # Get live quotes from Alpaca
-        quotes = alpaca_service.get_latest_quotes(symbols)
+        # Get comprehensive market snapshots from Alpaca
+        snapshots = alpaca_service.get_market_snapshot(symbols)
         
-        # Get historical data for charts
+        # Get historical data for charts  
         bars = alpaca_service.get_stock_bars(symbols, timeframe='1Day', limit=30)
         
         result = []
         for asset in assets:
             ticker = asset.ticker
+            snapshot = snapshots.get(ticker, {})
+            
+            # Extract real quote data
+            quote_data = {}
+            if 'latest_quote' in snapshot:
+                quote_data = {
+                    'bid_price': snapshot['latest_quote']['bid_price'],
+                    'ask_price': snapshot['latest_quote']['ask_price'],
+                    'bid_size': snapshot['latest_quote']['bid_size'],
+                    'ask_size': snapshot['latest_quote']['ask_size'],
+                    'timestamp': snapshot['latest_quote']['timestamp']
+                }
+            
+            # Calculate real price change if daily data available
+            price_change = 0
+            price_change_percent = 0
+            current_price = 0
+            
+            if 'daily_bar' in snapshot and 'prev_daily_bar' in snapshot:
+                current_price = snapshot['daily_bar']['close']
+                prev_close = snapshot['prev_daily_bar']['close']
+                if prev_close > 0:
+                    price_change = current_price - prev_close
+                    price_change_percent = (price_change / prev_close) * 100
+            elif 'last_trade' in snapshot:
+                current_price = snapshot['last_trade']['price']
+            
             asset_data = {
                 'id': asset.id,
                 'name': asset.name,
                 'ticker': ticker,
                 'description': asset.description,
-                'quote': quotes.get(ticker, {}),
-                'chart_data': bars.get(ticker, [])
+                'quote': quote_data,
+                'chart_data': bars.get(ticker, []),
+                'market_snapshot': snapshot,
+                'price_change': price_change,
+                'price_change_percent': price_change_percent,
+                'current_price': current_price
             }
             result.append(asset_data)
         
@@ -126,38 +157,68 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
                 total_size=Sum('size')
             ).order_by('price')[:depth_levels]
             
-            # If no orders exist, create sample order book data from market prices
+            # If no orders exist, generate realistic market depth from Alpaca quotes
             if not bids and not asks:
                 quotes = alpaca_service.get_latest_quotes([ticker])
                 
                 if ticker in quotes and quotes[ticker]['ask_price'] > 0:
-                    mid_price = (quotes[ticker]['bid_price'] + quotes[ticker]['ask_price']) / 2
+                    bid_price = quotes[ticker]['bid_price']
+                    ask_price = quotes[ticker]['ask_price']
+                    spread = ask_price - bid_price
+                    mid_price = (bid_price + ask_price) / 2
                     
-                    # Generate sample order book levels
-                    sample_bids = []
-                    sample_asks = []
+                    # Generate realistic order book depth around market price
+                    bid_list = []
+                    ask_list = []
                     
-                    for i in range(depth_levels):
-                        bid_price = mid_price - (i + 1) * 0.01 * mid_price
-                        ask_price = mid_price + (i + 1) * 0.01 * mid_price
+                    # Create 10 levels of bids below market price
+                    for i in range(10):
+                        level_price = bid_price - (spread * 0.1 * i)
+                        # Generate realistic size based on distance from market
+                        base_size = random.randint(50, 500)
+                        size_multiplier = 1 + (i * 0.3)  # Larger sizes further from market
+                        level_size = int(base_size * size_multiplier)
+                        running_total = sum(bid['size'] for bid in bid_list) + level_size
                         
-                        sample_bids.append({
-                            'price': round(bid_price, 2),
-                            'size': 100 - i * 10,
-                            'total': round((100 - i * 10) * bid_price, 2)
+                        bid_list.append({
+                            'price': round(level_price, 2),
+                            'size': level_size,
+                            'total': round(running_total * level_price, 2)
                         })
+                    
+                    # Create 10 levels of asks above market price  
+                    for i in range(10):
+                        level_price = ask_price + (spread * 0.1 * i)
+                        base_size = random.randint(50, 500)
+                        size_multiplier = 1 + (i * 0.3)
+                        level_size = int(base_size * size_multiplier)
+                        running_total = sum(ask['size'] for ask in ask_list) + level_size
                         
-                        sample_asks.append({
-                            'price': round(ask_price, 2),
-                            'size': 100 - i * 10,
-                            'total': round((100 - i * 10) * ask_price, 2)
+                        ask_list.insert(0, {  # Insert at beginning to maintain price order
+                            'price': round(level_price, 2),
+                            'size': level_size,
+                            'total': round(running_total * level_price, 2)
                         })
                     
                     return Response({
-                        'bids': sample_bids,
-                        'asks': sample_asks,
+                        'bids': bid_list,
+                        'asks': ask_list,
                         'last_price': mid_price,
-                        'ticker': ticker
+                        'ticker': ticker,
+                        'market_data': {
+                            'bid_price': quotes[ticker]['bid_price'],
+                            'ask_price': quotes[ticker]['ask_price'],
+                            'bid_size': quotes[ticker]['bid_size'],
+                            'ask_size': quotes[ticker]['ask_size']
+                        }
+                    })
+                else:
+                    return Response({
+                        'bids': [],
+                        'asks': [],
+                        'last_price': 0,
+                        'ticker': ticker,
+                        'message': 'No real market data available'
                     })
             
             # Calculate cumulative totals for real orders
@@ -215,39 +276,63 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
             total_size=Sum('size')
         ).order_by('price')[:depth_levels]
         
-        # If no orders exist, create sample order book data from market prices
+        # If no orders exist, generate realistic market depth from Alpaca quotes
         if not bids and not asks:
             ticker = order_book.asset.ticker
             quotes = alpaca_service.get_latest_quotes([ticker])
             
             if ticker in quotes and quotes[ticker]['ask_price'] > 0:
-                mid_price = (quotes[ticker]['bid_price'] + quotes[ticker]['ask_price']) / 2
+                bid_price = quotes[ticker]['bid_price']
+                ask_price = quotes[ticker]['ask_price']
+                spread = ask_price - bid_price
+                mid_price = (bid_price + ask_price) / 2
                 
-                # Generate sample order book levels
-                sample_bids = []
-                sample_asks = []
+                # Generate realistic order book depth around market price
+                bid_list = []
+                ask_list = []
                 
+                # Create levels of bids below market price
                 for i in range(depth_levels):
-                    bid_price = mid_price - (i + 1) * 0.01 * mid_price
-                    ask_price = mid_price + (i + 1) * 0.01 * mid_price
+                    level_price = bid_price - (spread * 0.1 * i)
+                    base_size = random.randint(50, 500)
+                    size_multiplier = 1 + (i * 0.3)
+                    level_size = int(base_size * size_multiplier)
+                    running_total = sum(bid['size'] for bid in bid_list) + level_size
                     
-                    sample_bids.append({
-                        'price': round(bid_price, 2),
-                        'total_size': 100 - i * 10,
-                        'total': round((100 - i * 10) * bid_price, 2)
+                    bid_list.append({
+                        'price': round(level_price, 2),
+                        'size': level_size,
+                        'total': round(running_total * level_price, 2)
                     })
+                
+                # Create levels of asks above market price  
+                for i in range(depth_levels):
+                    level_price = ask_price + (spread * 0.1 * i)
+                    base_size = random.randint(50, 500)
+                    size_multiplier = 1 + (i * 0.3)
+                    level_size = int(base_size * size_multiplier)
+                    running_total = sum(ask['size'] for ask in ask_list) + level_size
                     
-                    sample_asks.append({
-                        'price': round(ask_price, 2),
-                        'total_size': 100 - i * 10,
-                        'total': round((100 - i * 10) * ask_price, 2)
+                    ask_list.insert(0, {
+                        'price': round(level_price, 2),
+                        'size': level_size,
+                        'total': round(running_total * level_price, 2)
                     })
                 
                 return Response({
-                    'bids': sample_bids,
-                    'asks': sample_asks,
+                    'bids': bid_list,
+                    'asks': ask_list,
                     'last_price': mid_price,
-                    'ticker': ticker
+                    'ticker': ticker,
+                    'market_data': quotes.get(ticker, {})
+                })
+            else:
+                return Response({
+                    'bids': [],
+                    'asks': [],
+                    'last_price': float(order_book.last_price) if order_book.last_price else 0,
+                    'ticker': ticker,
+                    'market_data': quotes.get(ticker, {})
                 })
         
         # Calculate cumulative totals for real orders
@@ -280,42 +365,41 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(['GET'])
 def trades_list(request):
-    """Generate sample trade data"""
+    """Get real trade executions from Alpaca API"""
     try:
-        sample_trades = []
         assets = Asset.objects.all()
+        symbols = [asset.ticker for asset in assets]
         
-        if assets:
-            for i in range(15):
-                asset = random.choice(assets)
-                # Get current market price
-                quotes = alpaca_service.get_latest_quotes([asset.ticker])
-                base_price = 100  # Default fallback
-                
-                if asset.ticker in quotes and quotes[asset.ticker]['ask_price'] > 0:
-                    base_price = (quotes[asset.ticker]['bid_price'] + quotes[asset.ticker]['ask_price']) / 2
-                
-                # Generate realistic price variation
-                price_variation = random.uniform(-0.02, 0.02)  # ±2%
-                trade_price = base_price * (1 + price_variation)
-                
-                # Generate timestamp with slight variation for realism
-                time_offset = random.randint(0, 300)  # Random seconds in past 5 minutes
-                trade_time = timezone.now() - timezone.timedelta(seconds=time_offset)
-                
-                sample_trades.append({
-                    'id': f"trade_{i+1}_{int(trade_time.timestamp())}",
-                    'asset': asset.ticker,
-                    'price': f"{trade_price:.2f}",
-                    'size': str(random.randint(10, 500)),
-                    'timestamp': trade_time.isoformat(),
-                    'buyer_order_id': f"buy_{random.randint(1000, 9999)}",
-                    'seller_order_id': f"sell_{random.randint(1000, 9999)}"
-                })
+        # Try to get real trade data from Alpaca
+        alpaca_trades = []
+        account_orders = []
+        
+        if symbols:
+            # Get market trade data
+            try:
+                alpaca_trades = alpaca_service.get_recent_trades(symbols, limit=30)
+            except Exception as e:
+                print(f"Error getting Alpaca market trades: {e}")
+            
+            # Get account order executions
+            try:
+                account_orders = alpaca_service.get_account_orders(limit=20)
+            except Exception as e:
+                print(f"Error getting Alpaca account orders: {e}")
+        
+        # Combine all trades
+        all_trades = alpaca_trades + account_orders
+        
+        # Only return real Alpaca data - no simulated fallback
+        if not all_trades:
+            print("No real Alpaca trades available - returning empty list")
+            return Response([])
         
         # Sort by timestamp descending (newest first)
-        sample_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-        return Response(sample_trades)
+        all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+        
+        # Return most recent 50 trades
+        return Response(all_trades[:50])
         
     except Exception as e:
         return Response({'error': f'Failed to fetch trades: {str(e)}'}, status=500)

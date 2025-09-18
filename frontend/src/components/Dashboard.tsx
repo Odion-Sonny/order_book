@@ -27,6 +27,10 @@ interface AssetData {
     close: number;
     volume: number;
   }>;
+  price_change: number;
+  price_change_percent: number;
+  current_price: number;
+  market_snapshot: any;
 }
 
 const Dashboard: React.FC = () => {
@@ -110,9 +114,14 @@ const Dashboard: React.FC = () => {
       )}
       <Grid container spacing={3}>
         {assets.map((asset) => {
-          const midPrice = asset.quote?.bid_price && asset.quote?.ask_price 
-            ? (asset.quote.bid_price + asset.quote.ask_price) / 2 
-            : 0;
+          const displayPrice = asset.current_price || 
+            (asset.quote?.bid_price && asset.quote?.ask_price 
+              ? (asset.quote.bid_price + asset.quote.ask_price) / 2 
+              : 0);
+          
+          const priceChange = asset.price_change || 0;
+          const priceChangePercent = asset.price_change_percent || 0;
+          const isPositive = priceChange >= 0;
 
           return (
             <Grid item xs={12} sm={6} md={4} key={asset.ticker}>
@@ -141,11 +150,29 @@ const Dashboard: React.FC = () => {
                   </Typography>
                 </Box>
 
-                {midPrice > 0 && (
+                {displayPrice > 0 && (
                   <Box mb={2}>
                     <Typography variant="h5" color="primary.main" fontWeight="bold">
-                      ${midPrice.toFixed(2)}
+                      ${displayPrice.toFixed(2)}
                     </Typography>
+                    {(priceChange !== 0 || priceChangePercent !== 0) && (
+                      <Box display="flex" alignItems="center" gap={1} mt={1}>
+                        <Typography 
+                          variant="body2" 
+                          color={isPositive ? 'success.main' : 'error.main'}
+                          fontWeight="bold"
+                        >
+                          {isPositive ? '+' : ''}${priceChange.toFixed(2)}
+                        </Typography>
+                        <Typography 
+                          variant="body2" 
+                          color={isPositive ? 'success.main' : 'error.main'}
+                          fontWeight="bold"
+                        >
+                          ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)
+                        </Typography>
+                      </Box>
+                    )}
                   </Box>
                 )}
 
@@ -154,6 +181,11 @@ const Dashboard: React.FC = () => {
                     Bid: ${asset.quote?.bid_price?.toFixed(2) || '--'} | 
                     Ask: ${asset.quote?.ask_price?.toFixed(2) || '--'}
                   </Typography>
+                  {asset.market_snapshot?.daily_bar?.volume && (
+                    <Typography variant="caption" color="text.secondary" display="block" mt={1}>
+                      Volume: {asset.market_snapshot.daily_bar.volume.toLocaleString()}
+                    </Typography>
+                  )}
                 </Box>
               </Paper>
             </Grid>
