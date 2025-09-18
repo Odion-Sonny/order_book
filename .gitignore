@@ -13,6 +13,4 @@ __pycache__/
 /frontend/build/
 frontend/.env.development
 trading_engine/django.log
-.gitignore
-trading_engine/server.log
 trading_engine/server.log

@@ -1,7 +1,7 @@
 import React from 'react';
 import { BrowserRouter, Routes, Route } from 'react-router-dom';
 import { ThemeProvider, CssBaseline } from '@mui/material';
-import { darkTheme } from './theme';
+import { modernTheme } from './theme';
 import Layout from './components/Layout';
 import OrderBook from './components/OrderBook';
 import TradeHistory from './components/TradeHistory';
@@ -10,7 +10,7 @@ import Dashboard from './components/Dashboard';
 
 const App: React.FC = () => {
   return (
-    <ThemeProvider theme={darkTheme}>
+    <ThemeProvider theme={modernTheme}>
       <CssBaseline />
       <BrowserRouter>
         <Layout>
