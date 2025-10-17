@@ -56,12 +56,9 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'order_book',
-<<<<<<< HEAD
-=======
     'channels',
     'rest_framework',
     'corsheaders',
->>>>>>> order_book_functionality
 ]
 
 MIDDLEWARE = [

@@ -1,17 +1,8 @@
 from django.db import models
 from django.contrib.auth.models import User
 from django.utils import timezone
-from django.contrib.auth.models import AbstractUser
 
 # Create your models here.
-
-class Trader(AbstractUser):
-    """
-    Represents a trader that will be using the trading engine.
-    Inherits from the AbstractUser class.
-    """
-
-    pass
 
 
 class Asset(models.Model):

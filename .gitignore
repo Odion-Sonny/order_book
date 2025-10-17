@@ -14,3 +14,12 @@ __pycache__/
 frontend/.env.development
 trading_engine/django.log
 trading_engine/server.log
+
+# Alpaca MCP Server
+alpaca-mcp-server/
+
+# Markdown files (except README)
+*.md
+!README.md
+!readme.md
+!Readme.md
