@@ -1,11 +1,14 @@
 from django.shortcuts import render
-from rest_framework import viewsets, status
+from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
+from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
 from .models import Asset, Order, OrderBook
 from .serializers import AssetSerializer, OrderSerializer, OrderBookSerializer
 from .services.matching_engine import MatchingEngine
 from .services.alpaca_service import alpaca_service
+from .services.risk_management import RiskManagementService
+from .services.audit_logger import AuditLogger
 from django.db.models import Min, Max, Sum
 import random
 from decimal import Decimal
@@ -76,30 +79,85 @@ class AssetViewSet(viewsets.ModelViewSet):
 class OrderViewSet(viewsets.ModelViewSet):
     queryset = Order.objects.all()
     serializer_class = OrderSerializer
+    permission_classes = [IsAuthenticated]
+
+    def get_queryset(self):
+        # Users can only see their own orders
+        return Order.objects.filter(user=self.request.user)
 
     def perform_create(self, serializer):
-        # Get asset by ticker
-        asset_ticker = self.request.data.get('asset')
+        # Get asset by ticker or ID
+        asset_data = self.request.data.get('asset')
         try:
-            asset = Asset.objects.get(ticker=asset_ticker)
-            order = serializer.save(asset=asset)
+            if isinstance(asset_data, str):
+                asset = Asset.objects.get(ticker=asset_data)
+            else:
+                asset = Asset.objects.get(id=asset_data)
+
+            # Create order with user
+            order = serializer.save(asset=asset, user=self.request.user)
+
+            # Initialize risk management
+            risk_service = RiskManagementService(self.request.user)
+
+            # Validate order against risk limits
+            is_valid, error_message = risk_service.validate_order(order)
+
+            if not is_valid:
+                # Log risk limit violation
+                AuditLogger.log_risk_limit_violated(
+                    user=self.request.user,
+                    violation_details={
+                        'reason': error_message,
+                        'order_id': order.id,
+                        'asset': order.asset.ticker,
+                        'price': str(order.price),
+                        'size': str(order.size)
+                    },
+                    request=self.request
+                )
+
+                # Reject order
+                order.status = 'REJECTED'
+                order.save()
+
+                AuditLogger.log_order_rejected(
+                    user=self.request.user,
+                    order_details={
+                        'asset': order.asset.ticker,
+                        'price': str(order.price),
+                        'size': str(order.size),
+                        'order_type': order.order_type,
+                        'side': order.side
+                    },
+                    reason=error_message,
+                    request=self.request
+                )
+
+                raise serializers.ValidationError({'detail': error_message})
+
+            # Log order creation
+            AuditLogger.log_order_created(order, self.request)
+
+            # Update buying power (reserve funds for buy orders)
+            risk_service.update_buying_power(order, is_filled=False)
+
+            # Process order through matching engine
             order_book = OrderBook.objects.get(asset=order.asset)
             matching_engine = MatchingEngine(order_book)
             matched, filled_amount = matching_engine.process_order(order)
-            
+
             if matched:
-                return Response({
-                    'status': 'filled',
-                    'filled_amount': filled_amount
-                })
-            return Response({
-                'status': 'pending',
-                'filled_amount': filled_amount
-            })
+                # Update buying power again after fill
+                risk_service.update_buying_power(order, is_filled=True)
+
+                # Log order fill
+                AuditLogger.log_order_filled(order, self.request)
+
         except Asset.DoesNotExist:
-            return Response({
-                'error': f'Asset {asset_ticker} not found'
-            }, status=400)
+            raise serializers.ValidationError({'detail': f'Asset not found'})
+        except OrderBook.DoesNotExist:
+            raise serializers.ValidationError({'detail': f'Order book not found for {asset.ticker}'})
 
 class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OrderBook.objects.all()

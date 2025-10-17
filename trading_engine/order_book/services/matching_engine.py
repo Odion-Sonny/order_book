@@ -2,7 +2,7 @@ from decimal import Decimal
 from typing import List, Optional, Tuple, Dict
 from django.db import transaction
 from django.core.cache import cache
-from ..models import Order, OrderBook, Asset
+from ..models import Order, OrderBook, Asset, Trade
 from django.utils import timezone
 import redis
 from collections import defaultdict
@@ -128,27 +128,53 @@ class MatchingEngine:
     @transaction.atomic
     def _execute_trade(self, order: Order, opposite_order: Order, size: Decimal, price: Decimal) -> None:
         execution_time = timezone.now()
-        
+
+        # Determine buyer and seller
+        buy_order = order if order.side == 'BUY' else opposite_order
+        sell_order = opposite_order if order.side == 'BUY' else order
+
+        # Create Trade record
+        trade = Trade.objects.create(
+            buy_order=buy_order,
+            sell_order=sell_order,
+            asset=self.order_book.asset,
+            price=price,
+            size=size,
+            buyer=buy_order.user,
+            seller=sell_order.user,
+        )
+
+        # Update positions using risk management service
+        from .risk_management import RiskManagementService
+        risk_service = RiskManagementService(buy_order.user)
+        risk_service.update_position(trade)
+
+        # Log trade execution
+        from .audit_logger import AuditLogger
+        AuditLogger.log_trade_executed(trade)
+
         # Update orders
         if size == opposite_order.size:
             opposite_order.status = 'FILLED'
+            opposite_order.executed_at = execution_time
             self.cache.remove_order(opposite_order)
         else:
             opposite_order.size -= size
-            
+
         opposite_order.save()
-        
+
         if size == order.size:
             order.status = 'FILLED'
+            order.executed_at = execution_time
         else:
             order.size -= size
         order.save()
-        
+
         # Update order book and cache
         self.order_book.last_price = price
         self.order_book.volume += size
         self.order_book.save()
-        
+
         # Publish trade event
         self._publish_trade_event(order, opposite_order, size, price, execution_time)
 
