@@ -23,8 +23,9 @@ import {
   InputLabel,
   Select,
   MenuItem,
+  IconButton,
 } from '@mui/material';
-import { TrendingUp, TrendingDown, ShowChart } from '@mui/icons-material';
+import { TrendingUp, TrendingDown, ShowChart, Add, Delete } from '@mui/icons-material';
 import apiService, { Asset } from '../services/api';
 
 const Markets: React.FC = () => {
@@ -33,6 +34,19 @@ const Markets: React.FC = () => {
   const [error, setError] = useState('');
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
+
+  // Add stock dialog state
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
+  const [newStockTicker, setNewStockTicker] = useState('');
+  const [newStockName, setNewStockName] = useState('');
+  const [addStockLoading, setAddStockLoading] = useState(false);
+  const [addStockError, setAddStockError] = useState('');
+  const [addStockSuccess, setAddStockSuccess] = useState('');
+
+  // Delete stock dialog state
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
 
   // Order form state
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
@@ -45,7 +59,7 @@ const Markets: React.FC = () => {
 
   useEffect(() => {
     fetchMarketData();
-    const interval = setInterval(fetchMarketData, 10000); // Refresh every 10 seconds
+    const interval = setInterval(fetchMarketData, 1000); // Refresh every second for real-time updates
     return () => clearInterval(interval);
   }, []);
 
@@ -63,7 +77,8 @@ const Markets: React.FC = () => {
 
   const handleOpenOrderDialog = (asset: Asset) => {
     setSelectedAsset(asset);
-    setPrice(asset.current_price || asset.ask_price || '');
+    const priceValue = asset.current_price || asset.ask_price || '';
+    setPrice(String(priceValue));
     setOrderDialogOpen(true);
     setOrderError('');
     setOrderSuccess('');
@@ -107,6 +122,83 @@ const Markets: React.FC = () => {
     }
   };
 
+  const handleOpenAddStockDialog = () => {
+    setAddStockDialogOpen(true);
+    setNewStockTicker('');
+    setNewStockName('');
+    setAddStockError('');
+    setAddStockSuccess('');
+  };
+
+  const handleCloseAddStockDialog = () => {
+    setAddStockDialogOpen(false);
+    setNewStockTicker('');
+    setNewStockName('');
+    setAddStockError('');
+    setAddStockSuccess('');
+  };
+
+  const handleAddStock = async () => {
+    if (!newStockTicker.trim()) {
+      setAddStockError('Please enter a stock ticker symbol');
+      return;
+    }
+
+    setAddStockLoading(true);
+    setAddStockError('');
+    setAddStockSuccess('');
+
+    try {
+      await apiService.createAsset({
+        ticker: newStockTicker.toUpperCase().trim(),
+        name: newStockName.trim() || newStockTicker.toUpperCase().trim(),
+        description: `${newStockTicker.toUpperCase()} stock`,
+      });
+
+      setAddStockSuccess('Stock added successfully!');
+
+      // Refresh market data to include the new stock
+      await fetchMarketData();
+
+      setTimeout(() => {
+        handleCloseAddStockDialog();
+      }, 1500);
+    } catch (err: any) {
+      setAddStockError(err.message || 'Failed to add stock. It may already exist or be invalid.');
+    } finally {
+      setAddStockLoading(false);
+    }
+  };
+
+  const handleOpenDeleteDialog = (asset: Asset) => {
+    setAssetToDelete(asset);
+    setDeleteDialogOpen(true);
+  };
+
+  const handleCloseDeleteDialog = () => {
+    setDeleteDialogOpen(false);
+    setAssetToDelete(null);
+  };
+
+  const handleDeleteStock = async () => {
+    if (!assetToDelete) return;
+
+    setDeleteLoading(true);
+
+    try {
+      await apiService.deleteAsset(assetToDelete.id);
+
+      // Refresh market data to remove the deleted stock
+      await fetchMarketData();
+
+      handleCloseDeleteDialog();
+    } catch (err: any) {
+      setError(err.message || 'Failed to delete stock');
+    } finally {
+      setDeleteLoading(false);
+    }
+  };
+
   if (loading) {
     return (
       <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
@@ -125,24 +217,35 @@ const Markets: React.FC = () => {
 
   return (
     <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ mb: 4 }}>
-        <Typography variant="h4" gutterBottom fontWeight="bold">
-          Markets
-        </Typography>
-        <Typography variant="body1" color="text.secondary">
-          Real-time market data and order placement
-        </Typography>
+      {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
+      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+        <Box>
+          <Typography variant="h4" gutterBottom fontWeight="bold">
+            Markets
+          </Typography>
+          <Typography variant="body1" color="text.secondary">
+            Real-time market data and order placement
+          </Typography>
+        </Box>
+        <Button
+          variant="contained"
+          startIcon={<Add />}
+          onClick={handleOpenAddStockDialog}
+          sx={{ mt: 1 }}
+        >
+          Add Stock
+        </Button>
       </Box>
 
       <Grid container spacing={3}>
         {assets.map((asset) => {
-          const currentPrice = parseFloat(asset.current_price || '0');
-          const bidPrice = parseFloat(asset.bid_price || '0');
-          const askPrice = parseFloat(asset.ask_price || '0');
+          const currentPrice = parseFloat(String(asset.current_price || '0'));
+          const bidPrice = parseFloat(String(asset.bid_price || '0'));
+          const askPrice = parseFloat(String(asset.ask_price || '0'));
           const displayPrice = currentPrice || (bidPrice && askPrice ? (bidPrice + askPrice) / 2 : 0);
 
-          const priceChange = parseFloat(asset.price_change || '0');
-          const priceChangePercent = parseFloat(asset.price_change_percent || '0');
+          const priceChange = parseFloat(String(asset.price_change || '0'));
+          const priceChangePercent = parseFloat(String(asset.price_change_percent || '0'));
           const isPositive = priceChange >= 0;
 
           return (
@@ -169,7 +272,20 @@ const Markets: React.FC = () => {
                         {asset.name}
                       </Typography>
                     </div>
-                    <ShowChart color="primary" />
+                    <Box sx={{ display: 'flex', gap: 1 }}>
+                      <ShowChart color="primary" />
+                      <IconButton
+                        size="small"
+                        color="error"
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          handleOpenDeleteDialog(asset);
+                        }}
+                        sx={{ ml: 1 }}
+                      >
+                        <Delete fontSize="small" />
+                      </IconButton>
+                    </Box>
                   </Box>
 
                   {displayPrice > 0 && (
@@ -328,6 +444,95 @@ const Markets: React.FC = () => {
             disabled={orderLoading || !size || (orderType !== 'MARKET' && !price)}
           >
             {orderLoading ? <CircularProgress size={24} /> : 'Place Order'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Add Stock Dialog */}
+      <Dialog open={addStockDialogOpen} onClose={handleCloseAddStockDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Add New Stock
+        </DialogTitle>
+        <DialogContent>
+          {addStockError && (
+            <Alert severity="error" sx={{ mb: 2 }}>
+              {addStockError}
+            </Alert>
+          )}
+
+          {addStockSuccess && (
+            <Alert severity="success" sx={{ mb: 2 }}>
+              {addStockSuccess}
+            </Alert>
+          )}
+
+          <Box sx={{ mt: 2 }}>
+            <TextField
+              fullWidth
+              label="Stock Ticker Symbol"
+              placeholder="e.g., TSLA, MSFT, GOOGL"
+              value={newStockTicker}
+              onChange={(e) => setNewStockTicker(e.target.value.toUpperCase())}
+              margin="normal"
+              helperText="Enter the stock ticker symbol (e.g., AAPL for Apple Inc.)"
+              autoFocus
+            />
+
+            <TextField
+              fullWidth
+              label="Stock Name (Optional)"
+              placeholder="e.g., Tesla Inc."
+              value={newStockName}
+              onChange={(e) => setNewStockName(e.target.value)}
+              margin="normal"
+              helperText="Stock name will be auto-filled if left blank"
+            />
+
+            <Alert severity="info" sx={{ mt: 2 }}>
+              The stock will be added to your market watchlist and real-time data will be fetched from Alpaca.
+            </Alert>
+          </Box>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseAddStockDialog} disabled={addStockLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleAddStock}
+            variant="contained"
+            disabled={addStockLoading || !newStockTicker.trim()}
+            startIcon={addStockLoading ? <CircularProgress size={20} /> : <Add />}
+          >
+            {addStockLoading ? 'Adding...' : 'Add Stock'}
+          </Button>
+        </DialogActions>
+      </Dialog>
+
+      {/* Delete Stock Confirmation Dialog */}
+      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="sm" fullWidth>
+        <DialogTitle>
+          Remove Stock
+        </DialogTitle>
+        <DialogContent>
+          <Typography>
+            Are you sure you want to remove <strong>{assetToDelete?.ticker}</strong> ({assetToDelete?.name}) from your watchlist?
+          </Typography>
+          <Alert severity="warning" sx={{ mt: 2 }}>
+            This will remove the stock from your markets page. Any existing orders or positions for this stock will not be affected.
+          </Alert>
+        </DialogContent>
+        <DialogActions>
+          <Button onClick={handleCloseDeleteDialog} disabled={deleteLoading}>
+            Cancel
+          </Button>
+          <Button
+            onClick={handleDeleteStock}
+            variant="contained"
+            color="error"
+            disabled={deleteLoading}
+            startIcon={deleteLoading ? <CircularProgress size={20} /> : <Delete />}
+          >
+            {deleteLoading ? 'Removing...' : 'Remove Stock'}
           </Button>
         </DialogActions>
       </Dialog>

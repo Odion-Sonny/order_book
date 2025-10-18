@@ -178,6 +178,14 @@ class RiskManagementService:
 
         self.portfolio.save()
 
+    def restore_buying_power(self, order):
+        """Restore buying power when a buy order is cancelled"""
+        if order.side == 'BUY' and order.status == 'CANCELLED':
+            order_value = order.price * order.size
+            # Restore the reserved buying power
+            self.portfolio.buying_power += order_value
+            self.portfolio.save()
+
     def update_position(self, trade):
         """Update position after trade execution"""
         # Update buyer's position

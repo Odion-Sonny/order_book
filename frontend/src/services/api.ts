@@ -66,14 +66,17 @@ export interface Asset {
   id: number;
   ticker: string;
   name: string;
-  asset_type: string;
-  exchange: string;
-  is_tradable: boolean;
-  current_price?: string;
-  bid_price?: string;
-  ask_price?: string;
-  price_change?: string;
-  price_change_percent?: string;
+  asset_type?: string;
+  exchange?: string;
+  is_tradable?: boolean;
+  current_price?: string | number;
+  bid_price?: string | number;
+  ask_price?: string | number;
+  bid_size?: number;
+  ask_size?: number;
+  price_change?: string | number;
+  price_change_percent?: string | number;
+  description?: string;
 }
 
 export interface Backtest {
@@ -212,6 +215,12 @@ class ApiService {
         throw new Error(error.detail || `HTTP ${response.status}: ${response.statusText}`);
       }
 
+      // Handle empty responses (like 204 No Content from DELETE)
+      const contentType = response.headers.get('content-type');
+      if (response.status === 204 || !contentType || !contentType.includes('application/json')) {
+        return {} as T;
+      }
+
       return await response.json();
     } catch (error) {
       console.error(`API Error [${endpoint}]:`, error);
@@ -242,6 +251,23 @@ class ApiService {
 
   async getAsset(id: number): Promise<Asset> {
     return this.request<Asset>(`/api/assets/${id}/`);
+  }
+
+  async createAsset(assetData: {
+    ticker: string;
+    name: string;
+    description: string;
+  }): Promise<Asset> {
+    return this.request<Asset>('/api/assets/', {
+      method: 'POST',
+      body: JSON.stringify(assetData),
+    });
+  }
+
+  async deleteAsset(id: number): Promise<void> {
+    return this.request<void>(`/api/assets/${id}/`, {
+      method: 'DELETE',
+    });
   }
 
   async getMarketData(): Promise<Asset[]> {

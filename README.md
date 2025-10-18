@@ -324,7 +324,7 @@ AuditLog
 
 ```bash
 # Clone the repository
-git clone <your-repo-url>
+git clone https://github.com/Odion-Sonny/order_book
 cd order_book
 
 # Run the quick start script

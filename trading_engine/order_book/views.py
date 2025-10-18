@@ -17,7 +17,84 @@ from django.utils import timezone
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
     serializer_class = AssetSerializer
-    
+    permission_classes = [IsAuthenticatedOrReadOnly]
+
+    def perform_create(self, serializer):
+        """Validate ticker exists in Alpaca before creating asset"""
+        ticker = serializer.validated_data.get('ticker', '').upper()
+
+        # Check if ticker exists in Alpaca
+        try:
+            # Try to get latest quote for this ticker
+            quotes = alpaca_service.get_latest_quotes([ticker])
+
+            if not quotes or ticker not in quotes:
+                raise serializers.ValidationError({
+                    'ticker': f'Stock ticker "{ticker}" not found in Alpaca market data. Please verify the symbol is correct.'
+                })
+
+            # Check if the quote data is valid
+            quote_data = quotes[ticker]
+            if quote_data.get('ask_price', 0) <= 0 and quote_data.get('bid_price', 0) <= 0:
+                raise serializers.ValidationError({
+                    'ticker': f'Stock ticker "{ticker}" exists but has no valid market data. It may be delisted or not tradable.'
+                })
+
+        except Exception as e:
+            # If it's already a ValidationError, re-raise it
+            if isinstance(e, serializers.ValidationError):
+                raise
+            # For other exceptions, raise a validation error
+            raise serializers.ValidationError({
+                'ticker': f'Unable to validate ticker "{ticker}". Please try again or verify the symbol is correct.'
+            })
+
+        # If validation passes, create the asset
+        asset = serializer.save()
+
+        # Also create an OrderBook for this asset
+        OrderBook.objects.get_or_create(
+            asset=asset,
+            defaults={'last_price': Decimal('0.00')}
+        )
+
+    def perform_destroy(self, instance):
+        """Handle asset deletion with proper cleanup"""
+        try:
+            # Check if there are any pending orders for this asset
+            pending_orders_count = Order.objects.filter(
+                asset=instance,
+                status='PENDING'
+            ).count()
+
+            if pending_orders_count > 0:
+                raise serializers.ValidationError({
+                    'detail': f'Cannot delete {instance.ticker}. There are {pending_orders_count} pending order(s) for this asset. Please cancel them first.'
+                })
+
+            # Check if there are any open positions for this asset
+            from .models import Position
+            open_positions_count = Position.objects.filter(
+                asset=instance,
+                quantity__gt=0
+            ).count()
+
+            if open_positions_count > 0:
+                raise serializers.ValidationError({
+                    'detail': f'Cannot delete {instance.ticker}. There are {open_positions_count} open position(s) for this asset. Please close them first.'
+                })
+
+            # If no pending orders or open positions, safe to delete
+            # Django will cascade delete related OrderBook, filled Orders, and Trades
+            instance.delete()
+
+        except Exception as e:
+            if isinstance(e, serializers.ValidationError):
+                raise
+            raise serializers.ValidationError({
+                'detail': f'Failed to delete {instance.ticker}: {str(e)}'
+            })
+
     @action(detail=False, methods=['get'])
     def market_data(self, request):
         """Get real-time market data for all assets from Alpaca"""
@@ -37,20 +114,29 @@ class AssetViewSet(viewsets.ModelViewSet):
             
             # Extract real quote data
             quote_data = {}
+            bid_price = 0
+            ask_price = 0
+            bid_size = 0
+            ask_size = 0
+
             if 'latest_quote' in snapshot:
+                bid_price = snapshot['latest_quote']['bid_price']
+                ask_price = snapshot['latest_quote']['ask_price']
+                bid_size = snapshot['latest_quote']['bid_size']
+                ask_size = snapshot['latest_quote']['ask_size']
                 quote_data = {
-                    'bid_price': snapshot['latest_quote']['bid_price'],
-                    'ask_price': snapshot['latest_quote']['ask_price'],
-                    'bid_size': snapshot['latest_quote']['bid_size'],
-                    'ask_size': snapshot['latest_quote']['ask_size'],
+                    'bid_price': bid_price,
+                    'ask_price': ask_price,
+                    'bid_size': bid_size,
+                    'ask_size': ask_size,
                     'timestamp': snapshot['latest_quote']['timestamp']
                 }
-            
+
             # Calculate real price change if daily data available
             price_change = 0
             price_change_percent = 0
             current_price = 0
-            
+
             if 'daily_bar' in snapshot and 'prev_daily_bar' in snapshot:
                 current_price = snapshot['daily_bar']['close']
                 prev_close = snapshot['prev_daily_bar']['close']
@@ -59,7 +145,7 @@ class AssetViewSet(viewsets.ModelViewSet):
                     price_change_percent = (price_change / prev_close) * 100
             elif 'last_trade' in snapshot:
                 current_price = snapshot['last_trade']['price']
-            
+
             asset_data = {
                 'id': asset.id,
                 'name': asset.name,
@@ -70,7 +156,12 @@ class AssetViewSet(viewsets.ModelViewSet):
                 'market_snapshot': snapshot,
                 'price_change': price_change,
                 'price_change_percent': price_change_percent,
-                'current_price': current_price
+                'current_price': current_price,
+                # Flatten bid/ask for easy frontend access
+                'bid_price': bid_price,
+                'ask_price': ask_price,
+                'bid_size': bid_size,
+                'ask_size': ask_size
             }
             result.append(asset_data)
         
@@ -158,6 +249,53 @@ class OrderViewSet(viewsets.ModelViewSet):
             raise serializers.ValidationError({'detail': f'Asset not found'})
         except OrderBook.DoesNotExist:
             raise serializers.ValidationError({'detail': f'Order book not found for {asset.ticker}'})
+
+    @action(detail=True, methods=['post'])
+    def cancel(self, request, pk=None):
+        """Cancel a pending order"""
+        try:
+            order = self.get_object()
+
+            # Verify order belongs to user
+            if order.user != request.user:
+                return Response(
+                    {'detail': 'You do not have permission to cancel this order.'},
+                    status=status.HTTP_403_FORBIDDEN
+                )
+
+            # Check if order can be cancelled
+            if order.status != 'PENDING':
+                return Response(
+                    {'detail': f'Cannot cancel order with status: {order.status}'},
+                    status=status.HTTP_400_BAD_REQUEST
+                )
+
+            # Cancel the order
+            order.status = 'CANCELLED'
+            order.save()
+
+            # Log cancellation
+            AuditLogger.log_order_cancelled(order, request)
+
+            # Restore buying power if it was a buy order
+            if order.side == 'BUY':
+                risk_service = RiskManagementService(request.user)
+                risk_service.restore_buying_power(order)
+
+            # Serialize and return
+            serializer = self.get_serializer(order)
+            return Response(serializer.data)
+
+        except Order.DoesNotExist:
+            return Response(
+                {'detail': 'Order not found.'},
+                status=status.HTTP_404_NOT_FOUND
+            )
+        except Exception as e:
+            return Response(
+                {'detail': f'Failed to cancel order: {str(e)}'},
+                status=status.HTTP_500_INTERNAL_SERVER_ERROR
+            )
 
 class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
     queryset = OrderBook.objects.all()
