@@ -14,6 +14,7 @@ import Portfolio from './pages/Portfolio';
 import Markets from './pages/Markets';
 import Orders from './pages/Orders';
 import Backtesting from './pages/Backtesting';
+import StockDetail from './pages/StockDetail';
 
 // Create a clean, modern theme
 const theme = createTheme({
@@ -137,6 +138,14 @@ const App: React.FC = () => {
               element={
                 <ProtectedRoute>
                   <Markets />
+                </ProtectedRoute>
+              }
+            />
+            <Route
+              path="/stock/:ticker"
+              element={
+                <ProtectedRoute>
+                  <StockDetail />
                 </ProtectedRoute>
               }
             />

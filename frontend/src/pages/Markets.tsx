@@ -26,9 +26,11 @@ import {
   IconButton,
 } from '@mui/material';
 import { TrendingUp, TrendingDown, ShowChart, Add, Delete } from '@mui/icons-material';
+import { useNavigate } from 'react-router-dom';
 import apiService, { Asset } from '../services/api';
 
 const Markets: React.FC = () => {
+  const navigate = useNavigate();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -256,11 +258,13 @@ const Markets: React.FC = () => {
                   display: 'flex',
                   flexDirection: 'column',
                   transition: 'transform 0.2s, box-shadow 0.2s',
+                  cursor: 'pointer',
                   '&:hover': {
                     transform: 'translateY(-4px)',
                     boxShadow: 4,
                   },
                 }}
+                onClick={() => navigate(`/stock/${asset.ticker}`)}
               >
                 <CardContent sx={{ flexGrow: 1 }}>
                   <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
@@ -335,7 +339,10 @@ const Markets: React.FC = () => {
                   <Button
                     fullWidth
                     variant="contained"
-                    onClick={() => handleOpenOrderDialog(asset)}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleOpenOrderDialog(asset);
+                    }}
                   >
                     Trade
                   </Button>

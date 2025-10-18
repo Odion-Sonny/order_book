@@ -96,6 +96,28 @@ class AssetViewSet(viewsets.ModelViewSet):
             })
 
     @action(detail=False, methods=['get'])
+    def chart_data(self, request):
+        """Get historical chart data for a specific ticker"""
+        ticker = request.query_params.get('ticker')
+        timeframe = request.query_params.get('timeframe', '1Day')
+        limit = int(request.query_params.get('limit', 30))
+
+        if not ticker:
+            return Response({'error': 'ticker parameter is required'}, status=400)
+
+        try:
+            # Get historical bars from Alpaca
+            bars = alpaca_service.get_stock_bars([ticker], timeframe=timeframe, limit=limit)
+
+            if ticker in bars:
+                return Response({'bars': bars[ticker]})
+            else:
+                return Response({'bars': []})
+
+        except Exception as e:
+            return Response({'error': f'Failed to fetch chart data: {str(e)}'}, status=500)
+
+    @action(detail=False, methods=['get'])
     def market_data(self, request):
         """Get real-time market data for all assets from Alpaca"""
         assets = Asset.objects.all()
