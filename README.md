@@ -13,7 +13,7 @@ The Django Trading Engine is a web-based platform built on Django, designed to f
 
 ## Installation
 1. Clone the repository: `git clone https://github.com/yourusername/django-trading-engine.git`
-2. Navigate to the project directory: `cd django-trading-engine`
+2. Navigate to the project directory: `cd trading-engine`
 3. Install dependencies: `pip install -r requirements.txt`
 4. Configure your Django settings: Update `settings.py` with your database settings, secret key, and other configurations.
 5. Run migrations: `python manage.py migrate`

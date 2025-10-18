@@ -173,7 +173,8 @@ class WebInterfaceAPITests(APITestCase):
         """Test assets list endpoint"""
         response = self.client.get('/api/assets/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
-        self.assertEqual(len(response.data), 2)
+        # Check paginated results
+        self.assertEqual(len(response.data['results']), 2)
 
     def test_orderbooks_endpoint(self):
         """Test order books list endpoint"""
@@ -183,6 +184,8 @@ class WebInterfaceAPITests(APITestCase):
 
     def test_orders_endpoint(self):
         """Test orders endpoint"""
+        # Authenticate user
+        self.client.force_authenticate(user=self.user)
         response = self.client.get('/api/orders/')
         self.assertEqual(response.status_code, status.HTTP_200_OK)
 
