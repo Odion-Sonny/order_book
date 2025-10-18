@@ -196,7 +196,8 @@ class OrderViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only see their own orders
-        return Order.objects.filter(user=self.request.user)
+        # Optimized with select_related to reduce queries
+        return Order.objects.filter(user=self.request.user).select_related('asset').order_by('-created_at')
 
     def perform_create(self, serializer):
         # Get asset by ticker or ID
@@ -585,56 +586,60 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
 def trades_list(request):
     """Get real trade executions from Alpaca API with simulated fallback"""
     try:
+        # Optimized: Limit to reduce load - get parameter or default to 30
+        limit = min(int(request.GET.get('limit', 30)), 100)  # Max 100 trades
+
         assets = Asset.objects.all()
         symbols = [asset.ticker for asset in assets]
-        
+
         # Try to get real trade data from Alpaca
         alpaca_trades = []
         account_orders = []
-        
+
         if symbols:
-            # Get market trade data
+            # Get market trade data - reduced limit
             try:
-                alpaca_trades = alpaca_service.get_recent_trades(symbols, limit=30)
+                alpaca_trades = alpaca_service.get_recent_trades(symbols, limit=min(limit, 20))
             except Exception as e:
                 print(f"Error getting Alpaca market trades: {e}")
-            
-            # Get account order executions
+
+            # Get account order executions - reduced limit
             try:
-                account_orders = alpaca_service.get_account_orders(limit=20)
+                account_orders = alpaca_service.get_account_orders(limit=min(limit, 10))
             except Exception as e:
                 print(f"Error getting Alpaca account orders: {e}")
-        
+
         # Combine all trades
         all_trades = alpaca_trades + account_orders
-        
+
         # If no real Alpaca data, generate simulated trades with proper ordering
         if not all_trades and assets:
             sample_trades = []
             base_time = timezone.now()
-            for i in range(15):
+            # Reduced from 15 to min of limit or 15
+            for i in range(min(limit, 15)):
                 asset = random.choice(assets)
                 # Get current market price
                 quotes = alpaca_service.get_latest_quotes([asset.ticker])
                 base_price = 100  # Default fallback
-                
+
                 if asset.ticker in quotes and quotes[asset.ticker]['ask_price'] > 0:
                     base_price = (quotes[asset.ticker]['bid_price'] + quotes[asset.ticker]['ask_price']) / 2
-                
+
                 # Generate realistic price variation
                 price_variation = random.uniform(-0.02, 0.02)  # ±2%
                 trade_price = base_price * (1 + price_variation)
-                
+
                 # Generate sequential timestamps (newest first)
                 # Each trade is 15-45 seconds older than the previous one
                 seconds_back = sum([random.randint(15, 45) for _ in range(i + 1)])
                 trade_time = base_time - timezone.timedelta(seconds=seconds_back)
-                
+
                 # Generate additional trade properties for enhanced UI
                 side = random.choice(['BUY', 'SELL'])
                 size = random.randint(10, 500)
                 volume = trade_price * size
-                
+
                 sample_trades.append({
                     'id': f"trade_{i+1}_{int(trade_time.timestamp())}",
                     'asset': asset.ticker,
@@ -647,14 +652,14 @@ def trades_list(request):
                     'trade_type': 'MARKET',
                     'volume': f"{volume:.2f}"
                 })
-            
+
             all_trades = sample_trades
-        
+
         # Sort by timestamp descending (newest first)
         all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-        
-        # Return most recent 50 trades
-        return Response(all_trades[:50])
-        
+
+        # Return limited trades
+        return Response(all_trades[:limit])
+
     except Exception as e:
         return Response({'error': f'Failed to fetch trades: {str(e)}'}, status=500)

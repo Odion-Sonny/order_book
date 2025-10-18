@@ -89,18 +89,36 @@ const StockDetail: React.FC = () => {
       fetchStockData();
       fetchTrades();
 
-      // Refresh trades every second
-      const tradesInterval = setInterval(fetchTrades, 1000);
+      // Optimized: Refresh trades every 3 seconds instead of 1 second
+      const tradesInterval = setInterval(fetchTrades, 3000);
 
-      // Refresh chart every 30 seconds
-      const chartInterval = setInterval(fetchStockData, 30000);
+      // Optimized: Refresh market data every 10 seconds instead of 30 seconds
+      const marketInterval = setInterval(() => {
+        // Only fetch asset info, not chart data
+        fetchAssetInfo();
+      }, 10000);
 
       return () => {
         clearInterval(tradesInterval);
-        clearInterval(chartInterval);
+        clearInterval(marketInterval);
       };
     }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [ticker, timeframe]);
+
+  const fetchAssetInfo = async () => {
+    try {
+      // Only fetch asset info for real-time updates
+      const marketData = await apiService.getMarketData();
+      const foundAsset = marketData.find((a: Asset) => a.ticker === ticker);
+
+      if (foundAsset) {
+        setAsset(foundAsset);
+      }
+    } catch (err: any) {
+      console.error('Failed to update asset info:', err);
+    }
+  };
 
   const fetchStockData = async () => {
     try {
@@ -168,23 +186,15 @@ const StockDetail: React.FC = () => {
         (trade: Trade) =>
           (trade.asset_ticker === ticker || trade.asset === ticker)
       );
-      setTrades(stockTrades.slice(0, 50)); // Show last 50 trades
+      // Reduced from 50 to 30 for better performance
+      setTrades(stockTrades.slice(0, 30));
     } catch (err: any) {
       console.error('Failed to load trades:', err);
     }
   };
 
-  const handleTimeframeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newTimeframe: '1D' | '1W' | '1M' | '3M' | '1Y' | null,
-  ) => {
-    if (newTimeframe !== null) {
-      setTimeframe(newTimeframe);
-    }
-  };
-
-  // Prepare chart data for candlesticks
-  const prepareChartData = () => {
+  // Memoize chart data preparation to avoid recalculating on every render
+  const memoizedChartData = React.useMemo(() => {
     const candlestickData = chartData.map((bar) => ({
       x: new Date(bar.timestamp).getTime(),
       o: bar.open,
@@ -211,6 +221,18 @@ const StockDetail: React.FC = () => {
         },
       ],
     };
+  }, [chartData, ticker]);
+
+  // Memoize trades to prevent unnecessary re-renders
+  const memoizedTrades = React.useMemo(() => trades, [trades]);
+
+  const handleTimeframeChange = (
+    _event: React.MouseEvent<HTMLElement>,
+    newTimeframe: '1D' | '1W' | '1M' | '3M' | '1Y' | null,
+  ) => {
+    if (newTimeframe !== null) {
+      setTimeframe(newTimeframe);
+    }
   };
 
   const chartOptions = {
@@ -420,7 +442,7 @@ const StockDetail: React.FC = () => {
             <Box sx={{ height: 'calc(100% - 60px)' }}>
               {chartData.length > 0 ? (
                 // @ts-ignore - Chart.js financial plugin type definitions
-                <Chart type="candlestick" data={prepareChartData()} options={chartOptions} />
+                <Chart type="candlestick" data={memoizedChartData} options={chartOptions} />
               ) : (
                 <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
                   <Typography color="text.secondary">No chart data available</Typography>
@@ -439,7 +461,7 @@ const StockDetail: React.FC = () => {
                 Recent Trades
               </Typography>
               <Typography variant="caption" color="text.secondary">
-                Updates every second
+                Updates every 3 seconds
               </Typography>
             </Box>
             <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
@@ -453,7 +475,7 @@ const StockDetail: React.FC = () => {
                   </TableRow>
                 </TableHead>
                 <TableBody>
-                  {trades.length === 0 ? (
+                  {memoizedTrades.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={4} align="center">
                         <Typography variant="body2" color="text.secondary" py={4}>
@@ -462,7 +484,7 @@ const StockDetail: React.FC = () => {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    trades.map((trade) => (
+                    memoizedTrades.map((trade) => (
                       <TableRow key={trade.id}>
                         <TableCell>
                           <Typography variant="caption">

@@ -36,39 +36,47 @@ class PortfolioViewSet(viewsets.ModelViewSet):
 
     def get_queryset(self):
         # Users can only see their own portfolio
-        return Portfolio.objects.filter(user=self.request.user)
+        # Optimized with prefetch_related to reduce queries for positions
+        return Portfolio.objects.filter(user=self.request.user).prefetch_related(
+            'positions__asset'
+        )
 
     @action(detail=False, methods=['get'])
     def current(self, request):
         """Get current user's portfolio"""
-        portfolio, created = Portfolio.objects.get_or_create(
-            user=request.user,
-            defaults={
-                'cash_balance': Decimal('100000.00'),
-                'buying_power': Decimal('100000.00')
-            }
-        )
+        # Optimized with prefetch_related
+        try:
+            portfolio = Portfolio.objects.prefetch_related('positions__asset').get(user=request.user)
+        except Portfolio.DoesNotExist:
+            portfolio = Portfolio.objects.create(
+                user=request.user,
+                cash_balance=Decimal('100000.00'),
+                buying_power=Decimal('100000.00')
+            )
         serializer = self.get_serializer(portfolio)
         return Response(serializer.data)
 
     @action(detail=False, methods=['get'])
     def performance(self, request):
         """Get portfolio performance metrics"""
-        portfolio = get_object_or_404(Portfolio, user=request.user)
+        portfolio = get_object_or_404(
+            Portfolio.objects.prefetch_related('positions__asset'),
+            user=request.user
+        )
 
         # Calculate metrics
         total_value = portfolio.get_total_value()
         total_pnl = portfolio.get_pnl()
 
-        # Get trade statistics
+        # Get trade statistics - optimized with count() instead of fetching all
         trades_count = Trade.objects.filter(
             Q(buyer=request.user) | Q(seller=request.user)
         ).count()
 
-        # Get recent trades
+        # Get recent trades - optimized with select_related
         recent_trades = Trade.objects.filter(
             Q(buyer=request.user) | Q(seller=request.user)
-        ).order_by('-executed_at')[:10]
+        ).select_related('asset').order_by('-executed_at')[:10]
 
         return Response({
             'total_value': total_value,
@@ -90,9 +98,10 @@ class PositionViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         # Get positions for current user's portfolio
+        # Optimized with select_related to reduce queries
         try:
             portfolio = Portfolio.objects.get(user=self.request.user)
-            return Position.objects.filter(portfolio=portfolio)
+            return Position.objects.filter(portfolio=portfolio).select_related('asset').order_by('-updated_at')
         except Portfolio.DoesNotExist:
             return Position.objects.none()
 
@@ -122,9 +131,10 @@ class TradeViewSet(viewsets.ReadOnlyModelViewSet):
 
     def get_queryset(self):
         # Get trades where user was buyer or seller
+        # Optimized with select_related and ordering
         return Trade.objects.filter(
             Q(buyer=self.request.user) | Q(seller=self.request.user)
-        ).select_related('asset', 'buyer', 'seller')
+        ).select_related('asset', 'buyer', 'seller').order_by('-executed_at')
 
     @action(detail=False, methods=['get'])
     def statistics(self, request):

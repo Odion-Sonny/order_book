@@ -61,7 +61,8 @@ const Markets: React.FC = () => {
 
   useEffect(() => {
     fetchMarketData();
-    const interval = setInterval(fetchMarketData, 1000); // Refresh every second for real-time updates
+    // Reduced from 1 second to 5 seconds to improve performance
+    const interval = setInterval(fetchMarketData, 5000);
     return () => clearInterval(interval);
   }, []);
 
@@ -76,6 +77,9 @@ const Markets: React.FC = () => {
       setLoading(false);
     }
   };
+
+  // Memoize expensive calculations
+  const memoizedAssets = React.useMemo(() => assets, [assets]);
 
   const handleOpenOrderDialog = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -240,7 +244,7 @@ const Markets: React.FC = () => {
       </Box>
 
       <Grid container spacing={3}>
-        {assets.map((asset) => {
+        {memoizedAssets.map((asset) => {
           const currentPrice = parseFloat(String(asset.current_price || '0'));
           const bidPrice = parseFloat(String(asset.bid_price || '0'));
           const askPrice = parseFloat(String(asset.ask_price || '0'));

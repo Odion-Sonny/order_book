@@ -3,18 +3,28 @@
  * Handles routing and authentication flow
  */
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { ThemeProvider, CssBaseline, CircularProgress, Box } from '@mui/material';
 import { createTheme } from '@mui/material/styles';
 import { AuthProvider, useAuth } from './contexts/AuthContext';
 import AppLayout from './components/AppLayout';
-import Login from './pages/Login';
-import Portfolio from './pages/Portfolio';
-import Markets from './pages/Markets';
-import Orders from './pages/Orders';
-import Backtesting from './pages/Backtesting';
-import StockDetail from './pages/StockDetail';
+
+// Code splitting: Lazy load pages for better performance
+const Login = lazy(() => import('./pages/Login'));
+const Portfolio = lazy(() => import('./pages/Portfolio'));
+const Markets = lazy(() => import('./pages/Markets'));
+const Orders = lazy(() => import('./pages/Orders'));
+const Backtesting = lazy(() => import('./pages/Backtesting'));
+const StockDetail = lazy(() => import('./pages/StockDetail'));
+
+// Loading component
+const PageLoader = () => (
+  // @ts-ignore - MUI v5 sx prop causes complex union type error
+  <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh' }}>
+    <CircularProgress />
+  </Box>
+);
 
 // Create a clean, modern theme
 const theme = createTheme({
@@ -82,7 +92,7 @@ const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) =
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <PageLoader />;
   }
 
   if (!isAuthenticated) {
@@ -97,7 +107,7 @@ const PublicRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const { isAuthenticated, loading } = useAuth();
 
   if (loading) {
-    return <div>Loading...</div>;
+    return <PageLoader />;
   }
 
   if (isAuthenticated) {
@@ -113,62 +123,64 @@ const App: React.FC = () => {
       <CssBaseline />
       <AuthProvider>
         <BrowserRouter>
-          <Routes>
-            {/* Public Routes */}
-            <Route
-              path="/login"
-              element={
-                <PublicRoute>
-                  <Login />
-                </PublicRoute>
-              }
-            />
+          <Suspense fallback={<PageLoader />}>
+            <Routes>
+              {/* Public Routes */}
+              <Route
+                path="/login"
+                element={
+                  <PublicRoute>
+                    <Login />
+                  </PublicRoute>
+                }
+              />
 
-            {/* Protected Routes */}
-            <Route
-              path="/"
-              element={
-                <ProtectedRoute>
-                  <Portfolio />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/markets"
-              element={
-                <ProtectedRoute>
-                  <Markets />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/stock/:ticker"
-              element={
-                <ProtectedRoute>
-                  <StockDetail />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/orders"
-              element={
-                <ProtectedRoute>
-                  <Orders />
-                </ProtectedRoute>
-              }
-            />
-            <Route
-              path="/backtesting"
-              element={
-                <ProtectedRoute>
-                  <Backtesting />
-                </ProtectedRoute>
-              }
-            />
+              {/* Protected Routes */}
+              <Route
+                path="/"
+                element={
+                  <ProtectedRoute>
+                    <Portfolio />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/markets"
+                element={
+                  <ProtectedRoute>
+                    <Markets />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/stock/:ticker"
+                element={
+                  <ProtectedRoute>
+                    <StockDetail />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/orders"
+                element={
+                  <ProtectedRoute>
+                    <Orders />
+                  </ProtectedRoute>
+                }
+              />
+              <Route
+                path="/backtesting"
+                element={
+                  <ProtectedRoute>
+                    <Backtesting />
+                  </ProtectedRoute>
+                }
+              />
 
-            {/* Fallback */}
-            <Route path="*" element={<Navigate to="/" replace />} />
-          </Routes>
+              {/* Fallback */}
+              <Route path="*" element={<Navigate to="/" replace />} />
+            </Routes>
+          </Suspense>
         </BrowserRouter>
       </AuthProvider>
     </ThemeProvider>

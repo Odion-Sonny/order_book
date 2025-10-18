@@ -82,32 +82,24 @@ class AlpacaService:
                     
                     bars = self.data_client.get_stock_bars(request)
                     result[symbol] = []
-                    
-                    # Handle the response - try different access patterns
-                    if hasattr(bars, symbol):
+
+                    # Handle the response - Alpaca SDK returns a BarSet object with .data dict
+                    bar_list = None
+
+                    # Try accessing via .data dictionary (most common for newer SDK)
+                    if hasattr(bars, 'data') and isinstance(bars.data, dict) and symbol in bars.data:
+                        bar_list = bars.data[symbol]
+                    # Try direct dictionary access
+                    elif isinstance(bars, dict) and symbol in bars:
+                        bar_list = bars[symbol]
+                    # Try attribute access
+                    elif hasattr(bars, symbol):
                         bar_list = getattr(bars, symbol)
-                        for bar in bar_list:
-                            result[symbol].append({
-                                'timestamp': bar.timestamp.isoformat(),
-                                'open': float(bar.open),
-                                'high': float(bar.high),
-                                'low': float(bar.low),
-                                'close': float(bar.close),
-                                'volume': float(bar.volume)
-                            })
+                    # Try .data attribute access
                     elif hasattr(bars, 'data') and hasattr(bars.data, symbol):
                         bar_list = getattr(bars.data, symbol)
-                        for bar in bar_list:
-                            result[symbol].append({
-                                'timestamp': bar.timestamp.isoformat(),
-                                'open': float(bar.open),
-                                'high': float(bar.high),
-                                'low': float(bar.low),
-                                'close': float(bar.close),
-                                'volume': float(bar.volume)
-                            })
-                    elif symbol in bars:
-                        bar_list = bars[symbol]
+
+                    if bar_list:
                         for bar in bar_list:
                             result[symbol].append({
                                 'timestamp': bar.timestamp.isoformat(),
@@ -118,7 +110,9 @@ class AlpacaService:
                                 'volume': float(bar.volume)
                             })
                     else:
-                        logger.warning(f"No bars found for {symbol}, available keys: {dir(bars)}")
+                        logger.warning(f"No bars found for {symbol}. Bars type: {type(bars)}, has data: {hasattr(bars, 'data')}")
+                        if hasattr(bars, 'data'):
+                            logger.warning(f"Data type: {type(bars.data)}, Data keys: {bars.data.keys() if isinstance(bars.data, dict) else 'not a dict'}")
                         result[symbol] = []
                         
                 except Exception as e:
