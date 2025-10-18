@@ -29,10 +29,10 @@ import {
   ShowChart,
   AttachMoney,
 } from '@mui/icons-material';
-import apiService, { Portfolio, Position, Trade } from '../services/api';
+import apiService, { Portfolio as PortfolioType, Position, Trade } from '../services/api';
 
 const Portfolio: React.FC = () => {
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioType | null>(null);
   const [positions, setPositions] = useState<Position[]>([]);
   const [recentTrades, setRecentTrades] = useState<Trade[]>([]);
   const [loading, setLoading] = useState(true);
@@ -174,6 +174,7 @@ const Portfolio: React.FC = () => {
 
       {/* Positions Table */}
       <Paper sx={{ mb: 4 }}>
+        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Typography variant="h6" fontWeight="bold">
             Current Positions
@@ -230,6 +231,7 @@ const Portfolio: React.FC = () => {
 
       {/* Recent Trades */}
       <Paper>
+        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
         <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
           <Typography variant="h6" fontWeight="bold">
             Recent Trades

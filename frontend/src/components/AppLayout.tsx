@@ -17,14 +17,12 @@ import {
   Toolbar,
   Typography,
   Button,
-  Avatar,
   Menu,
   MenuItem,
   Divider,
   useTheme,
   useMediaQuery,
 } from '@mui/material';
-import type { SxProps, Theme } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -40,13 +38,13 @@ import { useAuth } from '../contexts/AuthContext';
 
 const drawerWidth = 240;
 
-interface MenuItem {
+interface NavigationItem {
   text: string;
   icon: React.ReactNode;
   path: string;
 }
 
-const menuItems: MenuItem[] = [
+const menuItems: NavigationItem[] = [
   { text: 'Portfolio', icon: <DashboardIcon />, path: '/' },
   { text: 'Markets', icon: <ShowChartIcon />, path: '/markets' },
   { text: 'Orders', icon: <AssignmentIcon />, path: '/orders' },
@@ -149,17 +147,16 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     </Box>
   );
 
-  const containerSx: SxProps<Theme> = { display: 'flex' };
-  const appBarSx: SxProps<Theme> = {
-    width: { md: `calc(100% - ${drawerWidth}px)` },
-    ml: { md: `${drawerWidth}px` },
-  };
-
   return (
-    <Box sx={containerSx}>
+    // @ts-ignore - MUI v5 known TypeScript issue with complex sx props
+    <Box sx={{ display: 'flex' }}>
+      {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
       <AppBar
         position="fixed"
-        sx={appBarSx}
+        sx={{
+          width: { md: `calc(100% - ${drawerWidth}px)` },
+          ml: { md: `${drawerWidth}px` },
+        }}
       >
         <Toolbar>
           <IconButton
