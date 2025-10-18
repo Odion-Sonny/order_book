@@ -25,28 +25,10 @@ import {
   CardContent,
 } from '@mui/material';
 import { PlayArrow, Refresh } from '@mui/icons-material';
-import apiService from '../services/api';
-
-interface BacktestRun {
-  id: number;
-  name: string;
-  status: string;
-  start_date: string;
-  end_date: string;
-  initial_capital: string;
-  created_at: string;
-  result?: {
-    total_return: string;
-    total_return_percent: string;
-    sharpe_ratio: string;
-    max_drawdown: string;
-    win_rate: string;
-    total_trades: number;
-  };
-}
+import apiService, { Backtest } from '../services/api';
 
 const Backtesting: React.FC = () => {
-  const [backtests, setBacktests] = useState<BacktestRun[]>([]);
+  const [backtests, setBacktests] = useState<Backtest[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -67,7 +49,7 @@ const Backtesting: React.FC = () => {
   const fetchBacktests = async () => {
     try {
       const data = await apiService.getBacktests();
-      setBacktests(data.results || data);
+      setBacktests(data.results || []);
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to load backtests');
@@ -265,15 +247,15 @@ const Backtesting: React.FC = () => {
                         {new Date(backtest.start_date).toLocaleDateString()} - {new Date(backtest.end_date).toLocaleDateString()}
                       </Typography>
 
-                      {backtest.result && (
+                      {backtest.results && (
                         <Box sx={{ mt: 2, pt: 2, borderTop: 1, borderColor: 'divider' }}>
                           <Grid container spacing={1}>
                             <Grid item xs={6}>
                               <Typography variant="caption" color="text.secondary">
                                 Return
                               </Typography>
-                              <Typography variant="body2" fontWeight="bold" color={parseFloat(backtest.result.total_return) >= 0 ? 'success.main' : 'error.main'}>
-                                ${parseFloat(backtest.result.total_return).toFixed(2)} ({backtest.result.total_return_percent}%)
+                              <Typography variant="body2" fontWeight="bold" color={parseFloat(backtest.results.total_return) >= 0 ? 'success.main' : 'error.main'}>
+                                ${parseFloat(backtest.results.total_return).toFixed(2)} ({backtest.results.total_return_percent}%)
                               </Typography>
                             </Grid>
                             <Grid item xs={6}>
@@ -281,7 +263,7 @@ const Backtesting: React.FC = () => {
                                 Sharpe Ratio
                               </Typography>
                               <Typography variant="body2" fontWeight="bold">
-                                {parseFloat(backtest.result.sharpe_ratio).toFixed(2)}
+                                {parseFloat(backtest.results.sharpe_ratio).toFixed(2)}
                               </Typography>
                             </Grid>
                             <Grid item xs={6}>
@@ -289,7 +271,7 @@ const Backtesting: React.FC = () => {
                                 Win Rate
                               </Typography>
                               <Typography variant="body2" fontWeight="bold">
-                                {backtest.result.win_rate}%
+                                {backtest.results.win_rate}%
                               </Typography>
                             </Grid>
                             <Grid item xs={6}>
@@ -297,7 +279,7 @@ const Backtesting: React.FC = () => {
                                 Total Trades
                               </Typography>
                               <Typography variant="body2" fontWeight="bold">
-                                {backtest.result.total_trades}
+                                {backtest.results.total_trades}
                               </Typography>
                             </Grid>
                           </Grid>

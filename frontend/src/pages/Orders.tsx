@@ -26,19 +26,7 @@ import {
   DialogActions,
 } from '@mui/material';
 import { Delete, Refresh } from '@mui/icons-material';
-import apiService from '../services/api';
-
-interface Order {
-  id: number;
-  asset: { ticker: string; name: string };
-  side: string;
-  order_type: string;
-  price: string;
-  size: string;
-  status: string;
-  created_at: string;
-  executed_at?: string;
-}
+import apiService, { Order } from '../services/api';
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -56,7 +44,7 @@ const Orders: React.FC = () => {
     setLoading(true);
     try {
       const data = await apiService.getOrders();
-      setOrders(data.results || data);
+      setOrders(data.results || []);
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to load orders');
@@ -163,7 +151,7 @@ const Orders: React.FC = () => {
                   <TableRow key={order.id}>
                     <TableCell>{order.id}</TableCell>
                     <TableCell>
-                      <Typography fontWeight="bold">{order.asset.ticker}</Typography>
+                      <Typography fontWeight="bold">{order.asset_ticker || 'N/A'}</Typography>
                     </TableCell>
                     <TableCell>
                       <Chip
@@ -218,7 +206,7 @@ const Orders: React.FC = () => {
           {selectedOrder && (
             <Box sx={{ mt: 2 }}>
               <Typography variant="body2">
-                <strong>Symbol:</strong> {selectedOrder.asset.ticker}
+                <strong>Symbol:</strong> {selectedOrder.asset_ticker || 'N/A'}
               </Typography>
               <Typography variant="body2">
                 <strong>Side:</strong> {selectedOrder.side}

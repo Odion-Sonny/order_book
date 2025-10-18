@@ -24,6 +24,7 @@ import {
   useTheme,
   useMediaQuery,
 } from '@mui/material';
+import type { SxProps, Theme } from '@mui/material';
 import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
@@ -148,14 +149,17 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
     </Box>
   );
 
+  const containerSx: SxProps<Theme> = { display: 'flex' };
+  const appBarSx: SxProps<Theme> = {
+    width: { md: `calc(100% - ${drawerWidth}px)` },
+    ml: { md: `${drawerWidth}px` },
+  };
+
   return (
-    <Box sx={{ display: 'flex' }}>
+    <Box sx={containerSx}>
       <AppBar
         position="fixed"
-        sx={{
-          width: { md: `calc(100% - ${drawerWidth}px)` },
-          ml: { md: `${drawerWidth}px` },
-        }}
+        sx={appBarSx}
       >
         <Toolbar>
           <IconButton

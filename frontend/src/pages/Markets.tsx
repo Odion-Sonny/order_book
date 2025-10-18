@@ -26,20 +26,7 @@ import {
   MenuItem,
 } from '@mui/material';
 import { TrendingUp, TrendingDown, ShowChart } from '@mui/icons-material';
-import apiService from '../services/api';
-
-interface Asset {
-  id: number;
-  ticker: string;
-  name: string;
-  current_price?: number;
-  price_change?: number;
-  price_change_percent?: number;
-  quote?: {
-    bid_price: number;
-    ask_price: number;
-  };
-}
+import apiService, { Asset } from '../services/api';
 
 const Markets: React.FC = () => {
   const [assets, setAssets] = useState<Asset[]>([]);
@@ -77,7 +64,7 @@ const Markets: React.FC = () => {
 
   const handleOpenOrderDialog = (asset: Asset) => {
     setSelectedAsset(asset);
-    setPrice(asset.current_price?.toString() || asset.quote?.ask_price?.toString() || '');
+    setPrice(asset.current_price || asset.ask_price || '');
     setOrderDialogOpen(true);
     setOrderError('');
     setOrderSuccess('');
@@ -150,14 +137,13 @@ const Markets: React.FC = () => {
 
       <Grid container spacing={3}>
         {assets.map((asset) => {
-          const displayPrice = asset.current_price || (
-            asset.quote?.bid_price && asset.quote?.ask_price
-              ? (asset.quote.bid_price + asset.quote.ask_price) / 2
-              : 0
-          );
+          const currentPrice = parseFloat(asset.current_price || '0');
+          const bidPrice = parseFloat(asset.bid_price || '0');
+          const askPrice = parseFloat(asset.ask_price || '0');
+          const displayPrice = currentPrice || (bidPrice && askPrice ? (bidPrice + askPrice) / 2 : 0);
 
-          const priceChange = asset.price_change || 0;
-          const priceChangePercent = asset.price_change_percent || 0;
+          const priceChange = parseFloat(asset.price_change || '0');
+          const priceChangePercent = parseFloat(asset.price_change_percent || '0');
           const isPositive = priceChange >= 0;
 
           return (
@@ -218,7 +204,7 @@ const Markets: React.FC = () => {
                         Bid
                       </Typography>
                       <Typography variant="body2" fontWeight="bold" color="success.main">
-                        ${asset.quote?.bid_price?.toFixed(2) || '--'}
+                        ${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}
                       </Typography>
                     </Box>
                     <Box>
@@ -226,7 +212,7 @@ const Markets: React.FC = () => {
                         Ask
                       </Typography>
                       <Typography variant="body2" fontWeight="bold" color="error.main">
-                        ${asset.quote?.ask_price?.toFixed(2) || '--'}
+                        ${askPrice > 0 ? askPrice.toFixed(2) : '--'}
                       </Typography>
                     </Box>
                   </Box>

@@ -29,36 +29,7 @@ import {
   ShowChart,
   AttachMoney,
 } from '@mui/icons-material';
-import apiService from '../services/api';
-
-interface Portfolio {
-  id: number;
-  cash_balance: string;
-  buying_power: string;
-  total_value: string;
-  total_pnl: string;
-  user_username: string;
-}
-
-interface Position {
-  id: number;
-  asset: { ticker: string; name: string };
-  quantity: string;
-  average_cost: string;
-  current_price: string;
-  unrealized_pnl: string;
-  cost_basis: string;
-}
-
-interface Trade {
-  id: number;
-  asset: { ticker: string };
-  price: string;
-  size: string;
-  buyer_username: string;
-  seller_username: string;
-  executed_at: string;
-}
+import apiService, { Portfolio, Position, Trade } from '../services/api';
 
 const Portfolio: React.FC = () => {
   const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
@@ -83,8 +54,8 @@ const Portfolio: React.FC = () => {
       ]);
 
       setPortfolio(portfolioData);
-      setPositions(positionsData.results || positionsData);
-      setRecentTrades((tradesData.results || tradesData).slice(0, 10));
+      setPositions(positionsData.results || []);
+      setRecentTrades((tradesData.results || []).slice(0, 10));
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to load portfolio data');
@@ -110,7 +81,8 @@ const Portfolio: React.FC = () => {
   }
 
   const totalValue = parseFloat(portfolio?.total_value || '0');
-  const totalPnL = parseFloat(portfolio?.total_pnl || '0');
+  // Calculate total P&L from positions
+  const totalPnL = positions.reduce((sum, pos) => sum + parseFloat(pos.unrealized_pnl || '0'), 0);
   const pnlPercent = totalValue > 0 ? (totalPnL / totalValue) * 100 : 0;
 
   return (
@@ -212,7 +184,6 @@ const Portfolio: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell><strong>Symbol</strong></TableCell>
-                <TableCell><strong>Name</strong></TableCell>
                 <TableCell align="right"><strong>Quantity</strong></TableCell>
                 <TableCell align="right"><strong>Avg Cost</strong></TableCell>
                 <TableCell align="right"><strong>Current Price</strong></TableCell>
@@ -223,7 +194,7 @@ const Portfolio: React.FC = () => {
             <TableBody>
               {positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={7} align="center">
+                  <TableCell colSpan={6} align="center">
                     <Typography color="text.secondary" py={2}>
                       No positions yet. Start trading to see your positions here.
                     </Typography>
@@ -232,18 +203,17 @@ const Portfolio: React.FC = () => {
               ) : (
                 positions.map((position) => {
                   const pnl = parseFloat(position.unrealized_pnl || '0');
-                  const totalValue = parseFloat(position.quantity) * parseFloat(position.current_price);
+                  const totalVal = parseFloat(position.total_value || '0');
 
                   return (
                     <TableRow key={position.id}>
                       <TableCell>
-                        <Typography fontWeight="bold">{position.asset.ticker}</Typography>
+                        <Typography fontWeight="bold">{position.asset_ticker}</Typography>
                       </TableCell>
-                      <TableCell>{position.asset.name}</TableCell>
                       <TableCell align="right">{parseFloat(position.quantity).toFixed(2)}</TableCell>
                       <TableCell align="right">${parseFloat(position.average_cost).toFixed(2)}</TableCell>
                       <TableCell align="right">${parseFloat(position.current_price).toFixed(2)}</TableCell>
-                      <TableCell align="right">${totalValue.toFixed(2)}</TableCell>
+                      <TableCell align="right">${totalVal.toFixed(2)}</TableCell>
                       <TableCell align="right">
                         <Typography color={pnl >= 0 ? 'success.main' : 'error.main'} fontWeight="bold">
                           ${pnl.toFixed(2)}
@@ -270,17 +240,16 @@ const Portfolio: React.FC = () => {
             <TableHead>
               <TableRow>
                 <TableCell><strong>Symbol</strong></TableCell>
+                <TableCell><strong>Side</strong></TableCell>
                 <TableCell><strong>Price</strong></TableCell>
                 <TableCell><strong>Size</strong></TableCell>
-                <TableCell><strong>Buyer</strong></TableCell>
-                <TableCell><strong>Seller</strong></TableCell>
                 <TableCell><strong>Time</strong></TableCell>
               </TableRow>
             </TableHead>
             <TableBody>
               {recentTrades.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
+                  <TableCell colSpan={5} align="center">
                     <Typography color="text.secondary" py={2}>
                       No trades yet
                     </Typography>
@@ -290,14 +259,19 @@ const Portfolio: React.FC = () => {
                 recentTrades.map((trade) => (
                   <TableRow key={trade.id}>
                     <TableCell>
-                      <Typography fontWeight="bold">{trade.asset.ticker}</Typography>
+                      <Typography fontWeight="bold">{trade.asset_ticker || 'N/A'}</Typography>
+                    </TableCell>
+                    <TableCell>
+                      <Chip
+                        label={trade.side}
+                        color={trade.side === 'BUY' ? 'success' : 'error'}
+                        size="small"
+                      />
                     </TableCell>
                     <TableCell>${parseFloat(trade.price).toFixed(2)}</TableCell>
                     <TableCell>{parseFloat(trade.size).toFixed(2)}</TableCell>
-                    <TableCell>{trade.buyer_username}</TableCell>
-                    <TableCell>{trade.seller_username}</TableCell>
                     <TableCell>
-                      {new Date(trade.executed_at).toLocaleString()}
+                      {new Date(trade.timestamp).toLocaleString()}
                     </TableCell>
                   </TableRow>
                 ))

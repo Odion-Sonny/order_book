@@ -5,9 +5,103 @@
 
 const API_BASE_URL = 'http://localhost:8000';
 
+// ==================== Type Definitions ====================
+
 interface AuthTokens {
   access: string;
   refresh: string;
+}
+
+export interface Portfolio {
+  id: number;
+  user: number;
+  user_username?: string;
+  cash_balance: string;
+  total_value: string;
+  buying_power: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Position {
+  id: number;
+  portfolio: number;
+  asset: number;
+  asset_ticker: string;
+  quantity: string;
+  average_cost: string;
+  current_price: string;
+  total_value: string;
+  unrealized_pnl: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Trade {
+  id: number;
+  order: number;
+  price: string;
+  size: string;
+  side: 'BUY' | 'SELL';
+  timestamp: string;
+  asset_ticker?: string;
+}
+
+export interface Order {
+  id: number;
+  portfolio: number;
+  asset: number;
+  asset_ticker?: string;
+  side: 'BUY' | 'SELL';
+  order_type: 'LIMIT' | 'MARKET' | 'STOP_LOSS';
+  price: string;
+  size: string;
+  filled_size: string;
+  status: 'PENDING' | 'FILLED' | 'CANCELLED' | 'REJECTED';
+  created_at: string;
+  updated_at: string;
+}
+
+export interface Asset {
+  id: number;
+  ticker: string;
+  name: string;
+  asset_type: string;
+  exchange: string;
+  is_tradable: boolean;
+  current_price?: string;
+  bid_price?: string;
+  ask_price?: string;
+  price_change?: string;
+  price_change_percent?: string;
+}
+
+export interface Backtest {
+  id: number;
+  user: number;
+  name: string;
+  strategy_code: string;
+  start_date: string;
+  end_date: string;
+  initial_capital: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  results?: {
+    total_return: string;
+    total_return_percent: string;
+    sharpe_ratio: string;
+    max_drawdown: string;
+    win_rate: string;
+    total_trades: number;
+  };
+  created_at: string;
+  updated_at: string;
+}
+
+export interface PaginatedResponse<T> {
+  count: number;
+  next: string | null;
+  previous: string | null;
+  results: T[];
 }
 
 class ApiService {
@@ -85,9 +179,9 @@ class ApiService {
     endpoint: string,
     options: RequestInit = {}
   ): Promise<T> {
-    const headers: HeadersInit = {
+    const headers: Record<string, string> = {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...(options.headers as Record<string, string> || {}),
     };
 
     if (this.accessToken) {
@@ -142,22 +236,22 @@ class ApiService {
 
   // ==================== Assets ====================
 
-  async getAssets() {
-    return this.request('/api/assets/');
+  async getAssets(): Promise<PaginatedResponse<Asset>> {
+    return this.request<PaginatedResponse<Asset>>('/api/assets/');
   }
 
-  async getAsset(id: number) {
-    return this.request(`/api/assets/${id}/`);
+  async getAsset(id: number): Promise<Asset> {
+    return this.request<Asset>(`/api/assets/${id}/`);
   }
 
-  async getMarketData() {
-    return this.request('/api/assets/market_data/');
+  async getMarketData(): Promise<Asset[]> {
+    return this.request<Asset[]>('/api/assets/market_data/');
   }
 
   // ==================== Orders ====================
 
-  async getOrders() {
-    return this.request('/api/orders/');
+  async getOrders(): Promise<PaginatedResponse<Order>> {
+    return this.request<PaginatedResponse<Order>>('/api/orders/');
   }
 
   async createOrder(orderData: {
@@ -166,61 +260,61 @@ class ApiService {
     order_type: 'LIMIT' | 'MARKET' | 'STOP_LOSS';
     price: string;
     size: string;
-  }) {
-    return this.request('/api/orders/', {
+  }): Promise<Order> {
+    return this.request<Order>('/api/orders/', {
       method: 'POST',
       body: JSON.stringify(orderData),
     });
   }
 
-  async cancelOrder(id: number) {
-    return this.request(`/api/orders/${id}/cancel/`, {
+  async cancelOrder(id: number): Promise<Order> {
+    return this.request<Order>(`/api/orders/${id}/cancel/`, {
       method: 'POST',
     });
   }
 
   // ==================== Portfolio ====================
 
-  async getCurrentPortfolio() {
-    return this.request('/api/portfolios/current/');
+  async getCurrentPortfolio(): Promise<Portfolio> {
+    return this.request<Portfolio>('/api/portfolios/current/');
   }
 
-  async getPortfolios() {
-    return this.request('/api/portfolios/');
+  async getPortfolios(): Promise<PaginatedResponse<Portfolio>> {
+    return this.request<PaginatedResponse<Portfolio>>('/api/portfolios/');
   }
 
-  async getPortfolioPerformance() {
-    return this.request('/api/portfolios/performance/');
+  async getPortfolioPerformance(): Promise<any> {
+    return this.request<any>('/api/portfolios/performance/');
   }
 
   // ==================== Positions ====================
 
-  async getPositions() {
-    return this.request('/api/positions/');
+  async getPositions(): Promise<PaginatedResponse<Position>> {
+    return this.request<PaginatedResponse<Position>>('/api/positions/');
   }
 
-  async getPosition(id: number) {
-    return this.request(`/api/positions/${id}/`);
+  async getPosition(id: number): Promise<Position> {
+    return this.request<Position>(`/api/positions/${id}/`);
   }
 
   // ==================== Trades ====================
 
-  async getTrades() {
-    return this.request('/api/trades/');
+  async getTrades(): Promise<PaginatedResponse<Trade>> {
+    return this.request<PaginatedResponse<Trade>>('/api/trades/');
   }
 
-  async getTradeHistory() {
-    return this.request('/api/trades-list/');
+  async getTradeHistory(): Promise<Trade[]> {
+    return this.request<Trade[]>('/api/trades-list/');
   }
 
   // ==================== Risk Limits ====================
 
-  async getRiskLimits() {
-    return this.request('/api/risk-limits/');
+  async getRiskLimits(): Promise<any> {
+    return this.request<any>('/api/risk-limits/');
   }
 
-  async updateRiskLimits(id: number, data: any) {
-    return this.request(`/api/risk-limits/${id}/`, {
+  async updateRiskLimits(id: number, data: any): Promise<any> {
+    return this.request<any>(`/api/risk-limits/${id}/`, {
       method: 'PATCH',
       body: JSON.stringify(data),
     });
@@ -228,8 +322,8 @@ class ApiService {
 
   // ==================== Backtesting ====================
 
-  async getBacktests() {
-    return this.request('/api/backtests/');
+  async getBacktests(): Promise<PaginatedResponse<Backtest>> {
+    return this.request<PaginatedResponse<Backtest>>('/api/backtests/');
   }
 
   async createBacktest(data: {
@@ -238,37 +332,37 @@ class ApiService {
     start_date: string;
     end_date: string;
     initial_capital: string;
-  }) {
-    return this.request('/api/backtests/', {
+  }): Promise<Backtest> {
+    return this.request<Backtest>('/api/backtests/', {
       method: 'POST',
       body: JSON.stringify(data),
     });
   }
 
-  async getBacktest(id: number) {
-    return this.request(`/api/backtests/${id}/`);
+  async getBacktest(id: number): Promise<Backtest> {
+    return this.request<Backtest>(`/api/backtests/${id}/`);
   }
 
-  async runBacktest(id: number) {
-    return this.request(`/api/backtests/${id}/run/`, {
+  async runBacktest(id: number): Promise<Backtest> {
+    return this.request<Backtest>(`/api/backtests/${id}/run/`, {
       method: 'POST',
     });
   }
 
   // ==================== Audit Logs ====================
 
-  async getAuditLogs() {
-    return this.request('/api/audit-logs/');
+  async getAuditLogs(): Promise<any> {
+    return this.request<any>('/api/audit-logs/');
   }
 
   // ==================== OrderBooks ====================
 
-  async getOrderBooks() {
-    return this.request('/api/orderbooks/');
+  async getOrderBooks(): Promise<any> {
+    return this.request<any>('/api/orderbooks/');
   }
 
-  async getOrderBook(ticker: string) {
-    return this.request(`/api/orderbooks/?asset__ticker=${ticker}`);
+  async getOrderBook(ticker: string): Promise<any> {
+    return this.request<any>(`/api/orderbooks/?asset__ticker=${ticker}`);
   }
 }
 
