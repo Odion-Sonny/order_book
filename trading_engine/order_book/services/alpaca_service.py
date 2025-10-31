@@ -73,10 +73,15 @@ class AlpacaService:
             # Process each symbol individually to avoid API issues
             for symbol in symbols:
                 try:
+                    # Calculate start date dynamically based on limit
+                    # Add 50% buffer to account for weekends/holidays
+                    days_to_fetch = int(limit * 1.5)
+                    start_date = datetime.now() - timedelta(days=days_to_fetch)
+
                     request = StockBarsRequest(
                         symbol_or_symbols=[symbol],  # Single symbol at a time
                         timeframe=tf,
-                        start=datetime.now() - timedelta(days=90),  # Reduced timeframe
+                        start=start_date,
                         limit=limit
                     )
                     

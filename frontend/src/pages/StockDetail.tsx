@@ -143,34 +143,31 @@ const StockDetail: React.FC = () => {
   };
 
   const fetchChartData = async (): Promise<ChartBar[]> => {
-    // Map timeframe to days
-    const timeframeMap: Record<string, number> = {
-      '1D': 1,
-      '1W': 7,
-      '1M': 30,
-      '3M': 90,
-      '1Y': 365,
+    // Map timeframe to configuration (as per user requirements)
+    const timeframeConfig: Record<string, { barTimeframe: string; limit: number }> = {
+      '1D': { barTimeframe: '1Hour', limit: 24 },     // 24 1-hour bars for 1 day
+      '1W': { barTimeframe: '1Hour', limit: 168 },    // 168 1-hour bars for 1 week
+      '1M': { barTimeframe: '1Day', limit: 30 },      // 30 daily bars for 1 month
+      '3M': { barTimeframe: '1Day', limit: 90 },      // 90 daily bars for 3 months
+      '1Y': { barTimeframe: '1Day', limit: 365 },     // 365 daily bars for 1 year
     };
 
-    const days = timeframeMap[timeframe];
+    const config = timeframeConfig[timeframe];
+    const url = `http://localhost:8000/api/assets/chart_data/?ticker=${ticker}&timeframe=${config.barTimeframe}&limit=${config.limit}`;
 
-    // Calculate bar timeframe based on days
-    let barTimeframe = '1Day';
-    if (days <= 1) barTimeframe = '5Min';
-    else if (days <= 7) barTimeframe = '1Hour';
-    else if (days <= 30) barTimeframe = '1Day';
-    else barTimeframe = '1Day';
+    console.log(`Fetching chart data: ${url}`);
 
     try {
-      const response = await fetch(
-        `http://localhost:8000/api/assets/chart_data/?ticker=${ticker}&timeframe=${barTimeframe}&limit=${days > 30 ? 365 : days * 10}`
-      );
+      const response = await fetch(url);
+
+      console.log(`Response status: ${response.status}`);
 
       if (!response.ok) {
-        throw new Error('Failed to fetch chart data');
+        throw new Error(`Failed to fetch chart data: ${response.status}`);
       }
 
       const data = await response.json();
+      console.log(`Received ${data.bars?.length || 0} bars from API`);
       return data.bars || [];
     } catch (err) {
       console.error('Error fetching chart data:', err);
