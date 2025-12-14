@@ -203,7 +203,7 @@ const Markets: React.FC = () => {
         </Button>
       </div>
 
-      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
         {assets.map((asset) => {
           const currentPrice = parseFloat(String(asset.current_price || '0'));
           const bidPrice = parseFloat(String(asset.bid_price || '0'));
@@ -215,18 +215,23 @@ const Markets: React.FC = () => {
           const isPositive = priceChange >= 0;
 
           return (
-            <Card key={asset.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/stock/${asset.ticker}`)}>
-              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+            <Card key={asset.id} className="cursor-pointer group relative overflow-hidden border-border/50 bg-card/50 backdrop-blur-sm hover:border-border hover:bg-card/80 transition-all duration-300" onClick={() => navigate(`/stock/${asset.ticker}`)}>
+              {/* Neon Glow on Hover */}
+              <div className={cn("absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 pointer-events-none bg-gradient-to-br", isPositive ? "from-emerald-500/5 to-transparent" : "from-red-500/5 to-transparent")} />
+
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2 relative z-10">
                 <div>
-                  <CardTitle className="text-xl font-bold">{asset.ticker}</CardTitle>
-                  <CardDescription>{asset.name}</CardDescription>
+                  <div className="flex items-center gap-2">
+                    <CardTitle className="text-xl font-bold tracking-tight">{asset.ticker}</CardTitle>
+                    <span className={cn("text-[10px] px-1.5 py-0.5 rounded border font-mono", isPositive ? "border-emerald-500/30 text-emerald-500 bg-emerald-500/5" : "border-red-500/30 text-red-500 bg-red-500/5")}>{isPositive ? 'BULL' : 'BEAR'}</span>
+                  </div>
+                  <CardDescription className="text-xs truncate max-w-[150px]">{asset.name}</CardDescription>
                 </div>
                 <div className="flex gap-2">
-                  <LineChart className="h-5 w-5 text-muted-foreground" />
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50"
+                    className="h-8 w-8 text-muted-foreground hover:text-red-500 hover:bg-red-500/10"
                     onClick={(e) => {
                       e.stopPropagation();
                       setAssetToDelete(asset);
@@ -237,43 +242,45 @@ const Markets: React.FC = () => {
                   </Button>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="relative z-10">
                 <div className="space-y-4">
                   {displayPrice > 0 ? (
                     <div>
-                      <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
+                      <div className="text-3xl font-bold font-mono tracking-tighter">${displayPrice.toFixed(2)}</div>
                       {(priceChange !== 0 || priceChangePercent !== 0) && (
-                        <div className={cn("flex items-center gap-1 text-sm font-medium", isPositive ? "text-emerald-500" : "text-red-500")}>
+                        <div className={cn("flex items-center gap-1 text-sm font-medium font-mono mt-1", isPositive ? "text-emerald-500" : "text-red-500")}>
                           {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
                           {isPositive ? "+" : ""}${priceChange.toFixed(2)} ({isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%)
                         </div>
                       )}
                     </div>
                   ) : (
-                    <div className="text-muted-foreground text-sm">Price unavailable</div>
+                    <div className="text-muted-foreground text-sm flex items-center gap-2">
+                      <AlertCircle className="h-4 w-4" /> Price unavailable
+                    </div>
                   )}
 
-                  <div className="flex justify-between text-sm">
-                    <div>
-                      <span className="text-muted-foreground block text-xs">Bid</span>
-                      <span className="font-medium text-emerald-600">${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}</span>
+                  <div className="grid grid-cols-2 gap-2 text-xs pt-2 border-t border-border/50">
+                    <div className="group/bid hover:bg-emerald-500/5 p-1 rounded transition-colors">
+                      <span className="text-muted-foreground block uppercase tracking-wider text-[10px]">Bid</span>
+                      <span className="font-mono font-medium text-emerald-500">${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}</span>
                     </div>
-                    <div className="text-right">
-                      <span className="text-muted-foreground block text-xs">Ask</span>
-                      <span className="font-medium text-red-600">${askPrice > 0 ? askPrice.toFixed(2) : '--'}</span>
+                    <div className="text-right group/ask hover:bg-red-500/5 p-1 rounded transition-colors">
+                      <span className="text-muted-foreground block uppercase tracking-wider text-[10px]">Ask</span>
+                      <span className="font-mono font-medium text-red-500">${askPrice > 0 ? askPrice.toFixed(2) : '--'}</span>
                     </div>
                   </div>
                 </div>
               </CardContent>
-              <CardFooter>
+              <CardFooter className="pt-0 relative z-10">
                 <Button
-                  className="w-full"
+                  className={cn("w-full font-semibold shadow-none border", isPositive ? "bg-emerald-500/10 text-emerald-500 border-emerald-500/20 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-500 border-red-500/20 hover:bg-red-500/20")}
                   onClick={(e) => {
                     e.stopPropagation();
                     handleOpenOrderDialog(asset);
                   }}
                 >
-                  Trade
+                  Quick Trade
                 </Button>
               </CardFooter>
             </Card>
@@ -282,9 +289,13 @@ const Markets: React.FC = () => {
       </div>
 
       {assets.length === 0 && (
-        <div className="text-center py-10 text-muted-foreground">
-          <LineChart className="mx-auto h-10 w-10 mb-3 opacity-20" />
-          <p>No stocks available. Add one to get started.</p>
+        <div className="text-center py-20 border-2 border-dashed border-border/50 rounded-xl bg-card/20">
+          <LineChart className="mx-auto h-12 w-12 mb-4 text-muted-foreground/50" />
+          <h3 className="text-lg font-medium text-foreground">No stocks tracked</h3>
+          <p className="text-muted-foreground mb-4">Add a ticker to your watchlist to start tracking.</p>
+          <Button onClick={() => setAddStockDialogOpen(true)} variant="outline">
+            <Plus className="h-4 w-4 mr-2" /> Add First Stock
+          </Button>
         </div>
       )}
 

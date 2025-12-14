@@ -5,7 +5,6 @@ import {
   ClipboardList,
   BarChart2,
   Menu,
-  X,
   User,
   LogOut,
   TrendingUp,
@@ -17,9 +16,8 @@ import { cn } from '@/lib/utils';
 import {
   Dialog,
   DialogContent,
-  DialogHeader,
   DialogTitle,
-  DialogTrigger,
+  DialogDescription,
 } from '@/components/ui/dialog';
 
 const menuItems = [
@@ -45,48 +43,55 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   };
 
   const NavContent = () => (
-    <div className="flex flex-col h-full bg-slate-950 text-slate-300">
-      <div className="flex items-center gap-3 p-6 border-b border-slate-800">
-        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/20 text-emerald-500">
+    <div className="flex flex-col h-full bg-card border-r border-border">
+      <div className="flex items-center gap-3 p-6 border-b border-border/40">
+        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-500 ring-1 ring-emerald-500/20 shadow-[0_0_10px_-3px_rgba(16,185,129,0.3)]">
           <TrendingUp className="h-6 w-6" />
         </div>
-        <span className="text-lg font-bold text-white tracking-tight">TradeEngine</span>
+        <span className="text-lg font-bold tracking-tight bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">TradeEngine</span>
       </div>
 
-      <nav className="flex-1 p-4 space-y-2">
-        {menuItems.map((item) => (
-          <Button
-            key={item.path}
-            variant="ghost"
-            className={cn(
-              "w-full justify-start gap-3 h-12 text-sm font-medium",
-              location.pathname === item.path
-                ? "bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20"
-                : "hover:bg-slate-900 hover:text-white"
-            )}
-            onClick={() => {
-              navigate(item.path);
-              setMobileMenuOpen(false);
-            }}
-          >
-            {item.icon}
-            {item.text}
-          </Button>
-        ))}
+      <nav className="flex-1 p-4 space-y-1">
+        {menuItems.map((item) => {
+          const isActive = location.pathname === item.path;
+          return (
+            <Button
+              key={item.path}
+              variant={isActive ? "glass" : "ghost"}
+              className={cn(
+                "w-full justify-start gap-3 h-11 text-sm font-medium transition-all duration-300",
+                isActive
+                  ? "border-emerald-500/20 shadow-[0_0_15px_-5px_rgba(16,185,129,0.2)]"
+                  : "text-muted-foreground hover:text-foreground hover:bg-white/5"
+              )}
+              onClick={() => {
+                navigate(item.path);
+                setMobileMenuOpen(false);
+              }}
+            >
+              {item.icon}
+              {item.text}
+              {isActive && (
+                <div className="ml-auto w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_rgba(16,185,129,1)]" />
+              )}
+            </Button>
+          );
+        })}
       </nav>
 
-      <div className="p-4 border-t border-slate-800">
-        <div className="flex items-center gap-3 px-3 py-2 mb-2">
-          <div className="h-8 w-8 rounded-full bg-slate-800 flex items-center justify-center">
+      <div className="p-4 border-t border-border/40">
+        <div className="flex items-center gap-3 px-3 py-3 mb-2 rounded-md bg-white/5 border border-white/5">
+          <div className="h-8 w-8 rounded-full bg-gradient-to-br from-indigo-500 to-purple-600 flex items-center justify-center text-white shadow-inner">
             <User className="h-4 w-4" />
           </div>
           <div className="flex-1 overflow-hidden">
-            <p className="text-sm font-medium text-white truncate">{username}</p>
+            <p className="text-xs font-medium text-muted-foreground">Logged in as</p>
+            <p className="text-sm font-bold text-foreground truncate">{username}</p>
           </div>
         </div>
         <Button
           variant="ghost"
-          className="w-full justify-start gap-3 text-red-500 hover:text-red-400 hover:bg-red-500/10"
+          className="w-full justify-start gap-3 text-red-400 hover:text-red-300 hover:bg-red-500/10 hover:border hover:border-red-500/20"
           onClick={handleLogout}
         >
           <LogOut className="h-4 w-4" />
@@ -97,7 +102,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
   );
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950">
+    <div className="flex min-h-screen bg-background text-foreground font-sans">
       {/* Desktop Sidebar */}
       <aside className="hidden w-64 md:flex flex-col fixed inset-y-0 z-50">
         <NavContent />
@@ -107,7 +112,11 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       <div className="md:hidden">
         <Dialog open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>
           <DialogContent className="p-0 border-none bg-transparent shadow-none max-w-[300px] h-full rounded-none">
-            <div className="h-full bg-slate-950 rounded-r-xl overflow-hidden border-r border-slate-800">
+            <DialogTitle className="sr-only">Mobile Navigation Menu</DialogTitle>
+            <DialogDescription className="sr-only">
+              Navigation options for mobile devices
+            </DialogDescription>
+            <div className="h-full bg-background rounded-r-xl overflow-hidden border-r border-border">
               <NavContent />
             </div>
           </DialogContent>
@@ -115,21 +124,21 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
       </div>
 
       {/* Main Content */}
-      <main className="flex-1 md:ml-64">
+      <main className="flex-1 md:ml-64 bg-background">
         {/* Mobile Header */}
-        <header className="md:hidden flex items-center justify-between p-4 bg-white border-b sticky top-0 z-40">
+        <header className="md:hidden flex items-center justify-between p-4 bg-background border-b border-border sticky top-0 z-40">
           <div className="flex items-center gap-2">
-            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-500/20 text-emerald-500">
+            <div className="flex h-8 w-8 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-500">
               <TrendingUp className="h-5 w-5" />
             </div>
-            <span className="font-bold text-slate-900">TradeEngine</span>
+            <span className="font-bold text-foreground">TradeEngine</span>
           </div>
           <Button variant="ghost" size="icon" onClick={() => setMobileMenuOpen(true)}>
             <Menu className="h-6 w-6" />
           </Button>
         </header>
 
-        <div className="p-4 md:p-8 animate-in fade-in zoom-in-95 duration-500">
+        <div className="p-4 md:p-8 animate-in fade-in zoom-in-95 duration-500 max-w-7xl mx-auto">
           {children}
         </div>
       </main>

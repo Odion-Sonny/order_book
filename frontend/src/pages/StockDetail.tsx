@@ -4,7 +4,6 @@ import {
   TrendingUp,
   TrendingDown,
   Clock,
-  DollarSign,
   Activity,
   BarChart2,
   AlertCircle
@@ -24,7 +23,7 @@ import { CandlestickController, CandlestickElement } from 'chartjs-chart-financi
 import 'chartjs-adapter-date-fns';
 import apiService, { Asset } from '../services/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { cn } from '@/lib/utils';
@@ -226,7 +225,7 @@ const StockDetail: React.FC = () => {
       x: {
         type: 'time' as const,
         time: {
-          unit: timeframe === '1D' ? 'hour' : 'day',
+          unit: (timeframe === '1D' ? 'hour' : 'day') as 'hour' | 'day',
           displayFormats: { hour: 'HH:mm', day: 'MMM dd' },
         },
         grid: {
@@ -332,23 +331,23 @@ const StockDetail: React.FC = () => {
         </Card>
       </div>
 
-      <div className="grid gap-6 lg:grid-cols-3">
+      <div className="grid gap-6 lg:grid-cols-4 h-[calc(100vh-250px)] min-h-[500px]">
         {/* Chart Section */}
-        <Card className="lg:col-span-2 flex flex-col min-h-[500px]">
-          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <BarChart2 className="h-4 w-4" /> Price Chart
+        <Card className="lg:col-span-3 flex flex-col border-border/50 bg-card/50 backdrop-blur-sm h-full">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b border-border/50 py-3">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+              <BarChart2 className="h-4 w-4 text-indigo-500" /> Price Action
             </CardTitle>
-            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+            <div className="flex bg-slate-950/50 p-1 rounded-lg border border-border/50">
               {(['1D', '1W', '1M', '3M', '1Y'] as const).map((tf) => (
                 <button
                   key={tf}
                   onClick={() => setTimeframe(tf)}
                   className={cn(
-                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                    "px-3 py-1 text-[10px] font-mono font-medium rounded-md transition-all",
                     timeframe === tf
-                      ? "bg-white dark:bg-slate-950 shadow-sm text-foreground"
-                      : "text-muted-foreground hover:text-foreground"
+                      ? "bg-emerald-500/20 text-emerald-500 border border-emerald-500/20 shadow-[0_0_10px_-5px_rgba(16,185,129,0.5)]"
+                      : "text-muted-foreground hover:text-foreground hover:bg-white/5"
                   )}
                 >
                   {tf}
@@ -356,53 +355,54 @@ const StockDetail: React.FC = () => {
               ))}
             </div>
           </CardHeader>
-          <CardContent className="flex-1 p-4">
+          <CardContent className="flex-1 p-0 relative">
             {chartData.length > 0 ? (
               // @ts-ignore - Chart.js financial plugin types
-              <Chart type="candlestick" data={memoizedChartData} options={chartOptions} />
+              <div className="absolute inset-0 p-4">
+                <Chart type="candlestick" data={memoizedChartData} options={chartOptions} />
+              </div>
             ) : (
               <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
-                <Activity className="h-8 w-8 opacity-20" />
-                <p>No chart data available for this timeframe</p>
+                <Activity className="h-12 w-12 opacity-10 animate-pulse" />
+                <p className="font-mono text-xs">Waiting for market data...</p>
               </div>
             )}
           </CardContent>
         </Card>
 
         {/* Trades Section */}
-        <Card className="flex flex-col h-[500px]">
-          <CardHeader className="border-b py-3">
-            <CardTitle className="text-base font-bold flex items-center gap-2">
-              <Clock className="h-4 w-4" /> Recent Trades
+        <Card className="flex flex-col border-border/50 bg-card/50 backdrop-blur-sm h-full overflow-hidden">
+          <CardHeader className="border-b border-border/50 py-3 bg-secondary/20">
+            <CardTitle className="text-sm font-bold flex items-center gap-2 uppercase tracking-wider text-muted-foreground">
+              <Clock className="h-4 w-4 text-purple-500" /> Tape
             </CardTitle>
-            <CardDescription className="text-xs">Live market activity</CardDescription>
           </CardHeader>
-          <CardContent className="p-0 overflow-y-auto flex-1">
+          <CardContent className="p-0 overflow-y-auto flex-1 scrollbar-thin scrollbar-thumb-border scrollbar-track-transparent">
             <Table>
-              <TableHeader className="sticky top-0 bg-background z-10">
-                <TableRow>
-                  <TableHead className="w-[80px]">Time</TableHead>
-                  <TableHead className="text-right">Price</TableHead>
-                  <TableHead className="text-right">Size</TableHead>
+              <TableHeader className="sticky top-0 bg-background/95 backdrop-blur-sm z-10 border-b border-border/50 shadow-sm">
+                <TableRow className="hover:bg-transparent border-none">
+                  <TableHead className="w-[80px] text-[10px] uppercase font-bold tracking-wider text-muted-foreground h-8">Time</TableHead>
+                  <TableHead className="text-right text-[10px] uppercase font-bold tracking-wider text-muted-foreground h-8">Price</TableHead>
+                  <TableHead className="text-right text-[10px] uppercase font-bold tracking-wider text-muted-foreground h-8">Size</TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
                 {memoizedTrades.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={3} className="text-center h-32 text-muted-foreground">
-                      No recent trades
+                    <TableCell colSpan={3} className="text-center h-32 text-muted-foreground text-xs font-mono">
+                      No recent volume
                     </TableCell>
                   </TableRow>
                 ) : (
                   memoizedTrades.map((trade) => (
-                    <TableRow key={trade.id} className="text-xs">
-                      <TableCell className="font-mono text-muted-foreground">
+                    <TableRow key={trade.id} className="text-xs hover:bg-white/5 border-b border-border/30 transition-colors cursor-default">
+                      <TableCell className="font-mono text-muted-foreground py-1.5 opacity-70">
                         {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                       </TableCell>
-                      <TableCell className={cn("text-right font-bold", trade.side === 'BUY' ? "text-emerald-600" : "text-red-600")}>
+                      <TableCell className={cn("text-right font-bold font-mono py-1.5", trade.side === 'BUY' ? "text-emerald-500" : "text-red-500")}>
                         ${parseFloat(trade.price).toFixed(2)}
                       </TableCell>
-                      <TableCell className="text-right font-mono">
+                      <TableCell className="text-right font-mono py-1.5 text-foreground/90">
                         {parseFloat(trade.size).toFixed(2)}
                       </TableCell>
                     </TableRow>
