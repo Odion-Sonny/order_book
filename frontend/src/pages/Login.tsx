@@ -1,22 +1,11 @@
-/**
- * Login Page
- * User authentication interface
- */
-
 import React, { useState } from 'react';
-import {
-  Container,
-  Paper,
-  TextField,
-  Button,
-  Typography,
-  Box,
-  Alert,
-  CircularProgress,
-} from '@mui/material';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../contexts/AuthContext';
-import { TrendingUp } from '@mui/icons-material';
+import { TrendingUp, AlertCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Login: React.FC = () => {
   const navigate = useNavigate();
@@ -42,101 +31,78 @@ const Login: React.FC = () => {
   };
 
   return (
-    <Container maxWidth="sm">
-      <Box
-        sx={{
-          minHeight: '100vh',
-          display: 'flex',
-          flexDirection: 'column',
-          justifyContent: 'center',
-          py: 4,
-        }}
-      >
-        <Paper
-          elevation={3}
-          sx={{
-            p: 4,
-            display: 'flex',
-            flexDirection: 'column',
-            alignItems: 'center',
-            borderRadius: 2,
-          }}
-        >
-          {/* Logo/Icon */}
-          <Box
-            sx={{
-              width: 60,
-              height: 60,
-              borderRadius: '50%',
-              bgcolor: 'primary.main',
-              display: 'flex',
-              alignItems: 'center',
-              justifyContent: 'center',
-              mb: 2,
-            }}
-          >
-            <TrendingUp sx={{ fontSize: 32, color: 'white' }} />
-          </Box>
+    <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-4">
+      <Card className="w-full max-w-md border-slate-200 dark:border-slate-800 shadow-xl">
+        <CardHeader className="space-y-4 flex flex-col items-center text-center pb-2">
+          <div className="h-16 w-16 rounded-2xl bg-slate-950 flex items-center justify-center shadow-lg mb-2 ring-1 ring-slate-900/10">
+            <TrendingUp className="h-8 w-8 text-emerald-500" />
+          </div>
+          <div className="space-y-1">
+            <CardTitle className="text-2xl font-bold tracking-tight">Trading Engine</CardTitle>
+            <CardDescription>
+              Enter your credentials to access the platform
+            </CardDescription>
+          </div>
+        </CardHeader>
+        <CardContent>
+          <form onSubmit={handleSubmit} className="space-y-4">
+            {error && (
+              <div className="bg-red-500/15 text-red-600 dark:text-red-400 p-3 rounded-lg flex items-center gap-2 text-sm font-medium">
+                <AlertCircle className="h-4 w-4" />
+                {error}
+              </div>
+            )}
 
-          <Typography component="h1" variant="h4" fontWeight="bold" gutterBottom>
-            Trading Engine
-          </Typography>
+            <div className="space-y-2">
+              <Label htmlFor="username">Username</Label>
+              <Input
+                id="username"
+                placeholder="Enter your username"
+                value={username}
+                onChange={(e) => setUsername(e.target.value)}
+                disabled={loading}
+                className="h-11"
+              />
+            </div>
 
-          <Typography variant="body2" color="text.secondary" gutterBottom sx={{ mb: 3 }}>
-            Sign in to access your portfolio
-          </Typography>
-
-          {error && (
-            <Alert severity="error" sx={{ width: '100%', mb: 2 }}>
-              {error}
-            </Alert>
-          )}
-
-          <Box component="form" onSubmit={handleSubmit} sx={{ width: '100%' }}>
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Username"
-              autoComplete="username"
-              autoFocus
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              disabled={loading}
-            />
-
-            <TextField
-              margin="normal"
-              required
-              fullWidth
-              label="Password"
-              type="password"
-              autoComplete="current-password"
-              value={password}
-              onChange={(e) => setPassword(e.target.value)}
-              disabled={loading}
-            />
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <Label htmlFor="password">Password</Label>
+              </div>
+              <Input
+                id="password"
+                type="password"
+                placeholder="••••••••"
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                disabled={loading}
+                className="h-11"
+              />
+            </div>
 
             <Button
               type="submit"
-              fullWidth
-              variant="contained"
-              size="large"
+              className="w-full h-11 bg-slate-900 hover:bg-slate-800 text-white"
               disabled={loading}
-              sx={{ mt: 3, mb: 2, py: 1.5 }}
             >
-              {loading ? <CircularProgress size={24} /> : 'Sign In'}
+              {loading ? (
+                <>
+                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                  Signing In...
+                </>
+              ) : (
+                'Sign In'
+              )}
             </Button>
-
-            <Box sx={{ mt: 2, textAlign: 'center' }}>
-              <Typography variant="body2" color="text.secondary">
-                Demo credentials: username: <strong>testuser</strong> / password: <strong>testpass123</strong>
-              </Typography>
-            </Box>
-          </Box>
-        </Paper>
-      </Box>
-    </Container>
+          </form>
+        </CardContent>
+        <CardFooter className="flex flex-col items-center gap-4 border-t bg-slate-50/50 p-6">
+          <p className="text-xs text-muted-foreground text-center">
+            Demo credentials: <span className="font-mono bg-slate-200 px-1 py-0.5 rounded text-slate-900">testuser</span> / <span className="font-mono bg-slate-200 px-1 py-0.5 rounded text-slate-900">testpass123</span>
+          </p>
+        </CardFooter>
+      </Card>
+    </div>
   );
 };
 

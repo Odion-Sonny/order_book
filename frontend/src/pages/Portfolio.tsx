@@ -1,35 +1,19 @@
-/**
- * Portfolio Dashboard
- * Main dashboard displaying portfolio overview, positions, and recent trades
- */
-
 import React, { useState, useEffect } from 'react';
-import {
-  Container,
-  Grid,
-  Paper,
-  Typography,
-  Box,
-  Card,
-  CardContent,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Chip,
-  CircularProgress,
-  Alert,
-} from '@mui/material';
 import {
   TrendingUp,
   TrendingDown,
-  AccountBalance,
-  ShowChart,
-  AttachMoney,
-} from '@mui/icons-material';
+  Wallet,
+  DollarSign,
+  Activity,
+  Layers,
+  History,
+  AlertCircle
+} from 'lucide-react';
 import apiService, { Portfolio as PortfolioType, Position, Trade } from '../services/api';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Badge } from '@/components/ui/badge';
+import { cn } from '@/lib/utils';
 
 const Portfolio: React.FC = () => {
   const [portfolio, setPortfolio] = useState<PortfolioType | null>(null);
@@ -40,7 +24,6 @@ const Portfolio: React.FC = () => {
 
   useEffect(() => {
     fetchData();
-    // Refresh every 30 seconds
     const interval = setInterval(fetchData, 30000);
     return () => clearInterval(interval);
   }, []);
@@ -66,159 +49,123 @@ const Portfolio: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200 flex items-center gap-2">
+        <AlertCircle className="h-5 w-5" />
+        {error}
+      </div>
     );
   }
 
   const totalValue = parseFloat(portfolio?.total_value || '0');
-  // Calculate total P&L from positions
   const totalPnL = positions.reduce((sum, pos) => sum + parseFloat(pos.unrealized_pnl || '0'), 0);
   const pnlPercent = totalValue > 0 ? (totalPnL / totalValue) * 100 : 0;
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Typography variant="h4" gutterBottom fontWeight="bold">
-        Portfolio Dashboard
-      </Typography>
+    <div className="space-y-6">
+      <div className="flex flex-col gap-1">
+        <h1 className="text-3xl font-bold tracking-tight">Portfolio</h1>
+        <p className="text-muted-foreground">Overview of your asset performance</p>
+      </div>
 
-      {/* Portfolio Summary Cards */}
-      <Grid container spacing={3} sx={{ mb: 4 }}>
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <AccountBalance color="primary" sx={{ mr: 1 }} />
-                <Typography color="text.secondary" variant="body2">
-                  Total Value
-                </Typography>
-              </Box>
-              <Typography variant="h5" fontWeight="bold">
-                ${totalValue.toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+      {/* Stats Grid */}
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total Value</CardTitle>
+            <Wallet className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${totalValue.toFixed(2)}</div>
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <AttachMoney color="success" sx={{ mr: 1 }} />
-                <Typography color="text.secondary" variant="body2">
-                  Cash Balance
-                </Typography>
-              </Box>
-              <Typography variant="h5" fontWeight="bold">
-                ${parseFloat(portfolio?.cash_balance || '0').toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Cash Balance</CardTitle>
+            <DollarSign className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${parseFloat(portfolio?.cash_balance || '0').toFixed(2)}</div>
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                <ShowChart color="info" sx={{ mr: 1 }} />
-                <Typography color="text.secondary" variant="body2">
-                  Buying Power
-                </Typography>
-              </Box>
-              <Typography variant="h5" fontWeight="bold">
-                ${parseFloat(portfolio?.buying_power || '0').toFixed(2)}
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Buying Power</CardTitle>
+            <Activity className="h-4 w-4 text-muted-foreground" />
+          </CardHeader>
+          <CardContent>
+            <div className="text-2xl font-bold">${parseFloat(portfolio?.buying_power || '0').toFixed(2)}</div>
+          </CardContent>
+        </Card>
 
-        <Grid item xs={12} sm={6} md={3}>
-          <Card>
-            <CardContent>
-              <Box sx={{ display: 'flex', alignItems: 'center', mb: 1 }}>
-                {totalPnL >= 0 ? (
-                  <TrendingUp color="success" sx={{ mr: 1 }} />
-                ) : (
-                  <TrendingDown color="error" sx={{ mr: 1 }} />
-                )}
-                <Typography color="text.secondary" variant="body2">
-                  Total P&L
-                </Typography>
-              </Box>
-              <Typography
-                variant="h5"
-                fontWeight="bold"
-                color={totalPnL >= 0 ? 'success.main' : 'error.main'}
-              >
-                ${totalPnL.toFixed(2)}
-              </Typography>
-              <Typography
-                variant="body2"
-                color={totalPnL >= 0 ? 'success.main' : 'error.main'}
-              >
-                {totalPnL >= 0 ? '+' : ''}{pnlPercent.toFixed(2)}%
-              </Typography>
-            </CardContent>
-          </Card>
-        </Grid>
-      </Grid>
+        <Card>
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+            <CardTitle className="text-sm font-medium">Total P&L</CardTitle>
+            {totalPnL >= 0 ?
+              <TrendingUp className="h-4 w-4 text-emerald-500" /> :
+              <TrendingDown className="h-4 w-4 text-red-500" />
+            }
+          </CardHeader>
+          <CardContent>
+            <div className={cn("text-2xl font-bold", totalPnL >= 0 ? "text-emerald-500" : "text-red-500")}>
+              {totalPnL >= 0 ? "+" : ""}${totalPnL.toFixed(2)}
+            </div>
+            <p className={cn("text-xs", totalPnL >= 0 ? "text-emerald-500" : "text-red-500")}>
+              {totalPnL >= 0 ? "+" : ""}{pnlPercent.toFixed(2)}%
+            </p>
+          </CardContent>
+        </Card>
+      </div>
 
       {/* Positions Table */}
-      <Paper sx={{ mb: 4 }}>
-        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6" fontWeight="bold">
-            Current Positions
-          </Typography>
-        </Box>
-        <TableContainer>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <Layers className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Current Positions</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
           <Table>
-            <TableHead>
+            <TableHeader>
               <TableRow>
-                <TableCell><strong>Symbol</strong></TableCell>
-                <TableCell align="right"><strong>Quantity</strong></TableCell>
-                <TableCell align="right"><strong>Avg Cost</strong></TableCell>
-                <TableCell align="right"><strong>Current Price</strong></TableCell>
-                <TableCell align="right"><strong>Total Value</strong></TableCell>
-                <TableCell align="right"><strong>P&L</strong></TableCell>
+                <TableHead>Symbol</TableHead>
+                <TableHead className="text-right">Quantity</TableHead>
+                <TableHead className="text-right">Avg Cost</TableHead>
+                <TableHead className="text-right">Current Price</TableHead>
+                <TableHead className="text-right">Total Value</TableHead>
+                <TableHead className="text-right">P&L</TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
               {positions.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={6} align="center">
-                    <Typography color="text.secondary" py={2}>
-                      No positions yet. Start trading to see your positions here.
-                    </Typography>
+                  <TableCell colSpan={6} className="text-center h-24 text-muted-foreground">
+                    No positions yet. Start trading to see your positions here.
                   </TableCell>
                 </TableRow>
               ) : (
                 positions.map((position) => {
                   const pnl = parseFloat(position.unrealized_pnl || '0');
                   const totalVal = parseFloat(position.total_value || '0');
-
                   return (
                     <TableRow key={position.id}>
-                      <TableCell>
-                        <Typography fontWeight="bold">{position.asset_ticker}</Typography>
-                      </TableCell>
-                      <TableCell align="right">{parseFloat(position.quantity).toFixed(2)}</TableCell>
-                      <TableCell align="right">${parseFloat(position.average_cost).toFixed(2)}</TableCell>
-                      <TableCell align="right">${parseFloat(position.current_price).toFixed(2)}</TableCell>
-                      <TableCell align="right">${totalVal.toFixed(2)}</TableCell>
-                      <TableCell align="right">
-                        <Typography color={pnl >= 0 ? 'success.main' : 'error.main'} fontWeight="bold">
-                          ${pnl.toFixed(2)}
-                        </Typography>
+                      <TableCell className="font-medium">{position.asset_ticker}</TableCell>
+                      <TableCell className="text-right">{parseFloat(position.quantity).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${parseFloat(position.average_cost).toFixed(2)}</TableCell>
+                      <TableCell className="text-right">${parseFloat(position.current_price).toFixed(2)}</TableCell>
+                      <TableCell className="text-right font-medium">${totalVal.toFixed(2)}</TableCell>
+                      <TableCell className={cn("text-right font-bold", pnl >= 0 ? "text-emerald-500" : "text-red-500")}>
+                        {pnl >= 0 ? "+" : ""}${pnl.toFixed(2)}
                       </TableCell>
                     </TableRow>
                   );
@@ -226,53 +173,47 @@ const Portfolio: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </TableContainer>
-      </Paper>
+        </CardContent>
+      </Card>
 
       {/* Recent Trades */}
-      <Paper>
-        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-        <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-          <Typography variant="h6" fontWeight="bold">
-            Recent Trades
-          </Typography>
-        </Box>
-        <TableContainer>
+      <Card>
+        <CardHeader>
+          <div className="flex items-center gap-2">
+            <History className="h-5 w-5 text-muted-foreground" />
+            <CardTitle>Recent Trades</CardTitle>
+          </div>
+        </CardHeader>
+        <CardContent>
           <Table>
-            <TableHead>
+            <TableHeader>
               <TableRow>
-                <TableCell><strong>Symbol</strong></TableCell>
-                <TableCell><strong>Side</strong></TableCell>
-                <TableCell><strong>Price</strong></TableCell>
-                <TableCell><strong>Size</strong></TableCell>
-                <TableCell><strong>Time</strong></TableCell>
+                <TableHead>Symbol</TableHead>
+                <TableHead>Side</TableHead>
+                <TableHead>Price</TableHead>
+                <TableHead>Size</TableHead>
+                <TableHead>Time</TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
               {recentTrades.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={5} align="center">
-                    <Typography color="text.secondary" py={2}>
-                      No trades yet
-                    </Typography>
+                  <TableCell colSpan={5} className="text-center h-24 text-muted-foreground">
+                    No trades yet
                   </TableCell>
                 </TableRow>
               ) : (
                 recentTrades.map((trade) => (
                   <TableRow key={trade.id}>
+                    <TableCell className="font-medium">{trade.asset_ticker}</TableCell>
                     <TableCell>
-                      <Typography fontWeight="bold">{trade.asset_ticker || 'N/A'}</Typography>
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={trade.side}
-                        color={trade.side === 'BUY' ? 'success' : 'error'}
-                        size="small"
-                      />
+                      <Badge variant={trade.side === 'BUY' ? 'default' : 'destructive'}>
+                        {trade.side}
+                      </Badge>
                     </TableCell>
                     <TableCell>${parseFloat(trade.price).toFixed(2)}</TableCell>
                     <TableCell>{parseFloat(trade.size).toFixed(2)}</TableCell>
-                    <TableCell>
+                    <TableCell className="text-muted-foreground text-sm">
                       {new Date(trade.timestamp).toLocaleString()}
                     </TableCell>
                   </TableRow>
@@ -280,9 +221,9 @@ const Portfolio: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </TableContainer>
-      </Paper>
-    </Container>
+        </CardContent>
+      </Card>
+    </div>
   );
 };
 
