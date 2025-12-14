@@ -47,7 +47,7 @@ The Trading Engine is a comprehensive, production-ready trading platform that co
 ✅ **Backtesting Engine** - Strategy validation with comprehensive performance metrics
 ✅ **JWT Authentication** - Secure token-based authentication with automatic refresh
 ✅ **RESTful API** - Complete REST API with Swagger/OpenAPI documentation
-✅ **Modern UI** - Clean, responsive React interface with Material-UI
+✅ **Modern UI** - Clean, responsive React interface with Tailwind CSS & Shadcn/ui
 ✅ **Comprehensive Testing** - 66+ tests with 100% feature coverage
 
 ---
@@ -196,7 +196,7 @@ The Trading Engine is a comprehensive, production-ready trading platform that co
 │                      Client Layer                           │
 │  ┌──────────────────────────────────────────────────────┐   │
 │  │          React Frontend (Port 3000)                  │   │
-│  │  - Material-UI Components                            │   │
+│  │  - Tailwind CSS + Shadcn/ui Components               │   │
 │  │  - JWT Authentication                                │   │
 │  │  - Real-time Updates                                 │   │
 │  │  - Responsive Design                                 │   │
@@ -300,7 +300,9 @@ AuditLog
 ### Frontend
 - **React 18.2** - UI framework
 - **TypeScript 4.9** - Type-safe JavaScript
-- **Material-UI 5.16** - Component library
+- **Tailwind CSS 3.4** - Utility-first CSS framework
+- **Shadcn/ui** - Reusable component library
+- **Lucide React** - Icon library
 - **React Router 6.28** - Client-side routing
 - **Fetch API** - HTTP client
 
