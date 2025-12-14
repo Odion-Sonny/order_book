@@ -1,30 +1,14 @@
-/**
- * Stock Detail Page
- * Shows detailed stock information with chart and real-time trades
- */
-
 import React, { useState, useEffect } from 'react';
 import {
-  Container,
-  Grid,
-  Paper,
-  Typography,
-  Box,
-  CircularProgress,
-  Alert,
-  Chip,
-  IconButton,
-  Table,
-  TableBody,
-  TableCell,
-  TableContainer,
-  TableHead,
-  TableRow,
-  Button,
-  ToggleButtonGroup,
-  ToggleButton,
-} from '@mui/material';
-import { ArrowBack, TrendingUp, TrendingDown } from '@mui/icons-material';
+  ArrowLeft,
+  TrendingUp,
+  TrendingDown,
+  Clock,
+  DollarSign,
+  Activity,
+  BarChart2,
+  AlertCircle
+} from 'lucide-react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Chart } from 'react-chartjs-2';
 import {
@@ -39,6 +23,11 @@ import {
 import { CandlestickController, CandlestickElement } from 'chartjs-chart-financial';
 import 'chartjs-adapter-date-fns';
 import apiService, { Asset } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { cn } from '@/lib/utils';
 
 // Register ChartJS components
 ChartJS.register(
@@ -88,13 +77,8 @@ const StockDetail: React.FC = () => {
     if (ticker) {
       fetchStockData();
       fetchTrades();
-
-      // Optimized: Refresh trades every 3 seconds instead of 1 second
       const tradesInterval = setInterval(fetchTrades, 3000);
-
-      // Optimized: Refresh market data every 10 seconds instead of 30 seconds
       const marketInterval = setInterval(() => {
-        // Only fetch asset info, not chart data
         fetchAssetInfo();
       }, 10000);
 
@@ -108,10 +92,8 @@ const StockDetail: React.FC = () => {
 
   const fetchAssetInfo = async () => {
     try {
-      // Only fetch asset info for real-time updates
       const marketData = await apiService.getMarketData();
       const foundAsset = marketData.find((a: Asset) => a.ticker === ticker);
-
       if (foundAsset) {
         setAsset(foundAsset);
       }
@@ -122,18 +104,13 @@ const StockDetail: React.FC = () => {
 
   const fetchStockData = async () => {
     try {
-      // Fetch market data to get asset info
       const marketData = await apiService.getMarketData();
       const foundAsset = marketData.find((a: Asset) => a.ticker === ticker);
-
       if (foundAsset) {
         setAsset(foundAsset);
       }
-
-      // Fetch historical chart data
       const bars = await fetchChartData();
       setChartData(bars);
-
       setError('');
     } catch (err: any) {
       setError(err.message || 'Failed to load stock data');
@@ -143,31 +120,22 @@ const StockDetail: React.FC = () => {
   };
 
   const fetchChartData = async (): Promise<ChartBar[]> => {
-    // Map timeframe to configuration (as per user requirements)
     const timeframeConfig: Record<string, { barTimeframe: string; limit: number }> = {
-      '1D': { barTimeframe: '1Hour', limit: 24 },     // 24 1-hour bars for 1 day
-      '1W': { barTimeframe: '1Hour', limit: 168 },    // 168 1-hour bars for 1 week
-      '1M': { barTimeframe: '1Day', limit: 30 },      // 30 daily bars for 1 month
-      '3M': { barTimeframe: '1Day', limit: 90 },      // 90 daily bars for 3 months
-      '1Y': { barTimeframe: '1Day', limit: 365 },     // 365 daily bars for 1 year
+      '1D': { barTimeframe: '1Hour', limit: 24 },
+      '1W': { barTimeframe: '1Hour', limit: 168 },
+      '1M': { barTimeframe: '1Day', limit: 30 },
+      '3M': { barTimeframe: '1Day', limit: 90 },
+      '1Y': { barTimeframe: '1Day', limit: 365 },
     };
 
     const config = timeframeConfig[timeframe];
+    // In a real app, this URL should be dynamic from environment
     const url = `http://localhost:8000/api/assets/chart_data/?ticker=${ticker}&timeframe=${config.barTimeframe}&limit=${config.limit}`;
-
-    console.log(`Fetching chart data: ${url}`);
 
     try {
       const response = await fetch(url);
-
-      console.log(`Response status: ${response.status}`);
-
-      if (!response.ok) {
-        throw new Error(`Failed to fetch chart data: ${response.status}`);
-      }
-
+      if (!response.ok) throw new Error(`Failed to fetch chart data: ${response.status}`);
       const data = await response.json();
-      console.log(`Received ${data.bars?.length || 0} bars from API`);
       return data.bars || [];
     } catch (err) {
       console.error('Error fetching chart data:', err);
@@ -178,19 +146,15 @@ const StockDetail: React.FC = () => {
   const fetchTrades = async () => {
     try {
       const allTrades = await apiService.getTradeHistory();
-      // Filter trades for this specific ticker
       const stockTrades = allTrades.filter(
-        (trade: Trade) =>
-          (trade.asset_ticker === ticker || trade.asset === ticker)
+        (trade: Trade) => (trade.asset_ticker === ticker || trade.asset === ticker)
       );
-      // Reduced from 50 to 30 for better performance
       setTrades(stockTrades.slice(0, 30));
     } catch (err: any) {
       console.error('Failed to load trades:', err);
     }
   };
 
-  // Memoize chart data preparation to avoid recalculating on every render
   const memoizedChartData = React.useMemo(() => {
     const candlestickData = chartData.map((bar) => ({
       x: new Date(bar.timestamp).getTime(),
@@ -206,52 +170,38 @@ const StockDetail: React.FC = () => {
           label: ticker,
           data: candlestickData,
           borderColors: {
-            up: '#26a69a',
-            down: '#ef5350',
-            unchanged: '#999',
+            up: '#10b981', // emerald-500
+            down: '#ef4444', // red-500
+            unchanged: '#94a3b8', // slate-400
           },
           backgroundColors: {
-            up: 'rgba(38, 166, 154, 0.8)',
-            down: 'rgba(239, 83, 80, 0.8)',
-            unchanged: 'rgba(153, 153, 153, 0.8)',
+            up: 'rgba(16, 185, 129, 0.8)',
+            down: 'rgba(239, 68, 68, 0.8)',
+            unchanged: 'rgba(148, 163, 184, 0.8)',
           },
         },
       ],
     };
   }, [chartData, ticker]);
 
-  // Memoize trades to prevent unnecessary re-renders
   const memoizedTrades = React.useMemo(() => trades, [trades]);
-
-  const handleTimeframeChange = (
-    _event: React.MouseEvent<HTMLElement>,
-    newTimeframe: '1D' | '1W' | '1M' | '3M' | '1Y' | null,
-  ) => {
-    if (newTimeframe !== null) {
-      setTimeframe(newTimeframe);
-    }
-  };
 
   const chartOptions = {
     responsive: true,
     maintainAspectRatio: false,
     layout: {
-      padding: {
-        right: 10,
-      },
+      padding: { right: 10 },
     },
     plugins: {
-      legend: {
-        display: false,
-      },
+      legend: { display: false },
       tooltip: {
         enabled: true,
         mode: 'index' as const,
         intersect: false,
-        backgroundColor: 'rgba(0, 0, 0, 0.8)',
-        titleColor: '#fff',
-        bodyColor: '#fff',
-        borderColor: '#333',
+        backgroundColor: 'rgba(15, 23, 42, 0.9)', // slate-950
+        titleColor: '#f8fafc', // slate-50
+        bodyColor: '#f8fafc',
+        borderColor: '#334155', // slate-700
         borderWidth: 1,
         padding: 10,
         displayColors: false,
@@ -277,19 +227,14 @@ const StockDetail: React.FC = () => {
         type: 'time' as const,
         time: {
           unit: timeframe === '1D' ? 'hour' : 'day',
-          displayFormats: {
-            hour: 'HH:mm',
-            day: 'MMM dd',
-          },
+          displayFormats: { hour: 'HH:mm', day: 'MMM dd' },
         },
         grid: {
           display: true,
-          color: 'rgba(0, 0, 0, 0.05)',
-          drawBorder: false,
+          color: 'rgba(148, 163, 184, 0.1)',
         },
         ticks: {
-          color: '#666',
-          maxRotation: 0,
+          color: '#64748b', // slate-500
           autoSkipPadding: 20,
         },
       },
@@ -297,11 +242,10 @@ const StockDetail: React.FC = () => {
         position: 'right' as const,
         grid: {
           display: true,
-          color: 'rgba(0, 0, 0, 0.05)',
-          drawBorder: false,
+          color: 'rgba(148, 163, 184, 0.1)',
         },
         ticks: {
-          color: '#666',
+          color: '#64748b',
           callback: (value: any) => `$${value.toFixed(2)}`,
         },
       },
@@ -315,20 +259,23 @@ const StockDetail: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
     );
   }
 
   if (error || !asset) {
     return (
-      <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error || 'Stock not found'}</Alert>
-        <Button startIcon={<ArrowBack />} onClick={() => navigate('/markets')} sx={{ mt: 2 }}>
-          Back to Markets
+      <div className="flex flex-col items-center justify-center min-h-[50vh] gap-4">
+        <div className="bg-red-50 text-red-600 p-4 rounded-md border border-red-200 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
+          {error || 'Stock not found'}
+        </div>
+        <Button variant="outline" onClick={() => navigate('/markets')}>
+          <ArrowLeft className="mr-2 h-4 w-4" /> Back to Markets
         </Button>
-      </Container>
+      </div>
     );
   }
 
@@ -341,185 +288,132 @@ const StockDetail: React.FC = () => {
   const isPositive = priceChange >= 0;
 
   return (
-    <Container maxWidth="xl" sx={{ mt: 4, mb: 4 }}>
-      {/* Header */}
-      {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-      <Box sx={{ mb: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-          <IconButton onClick={() => navigate('/markets')}>
-            <ArrowBack />
-          </IconButton>
-          <Box>
-            <Typography variant="h4" fontWeight="bold">
-              {ticker}
-            </Typography>
-            <Typography variant="body2" color="text.secondary">
-              {asset.name}
-            </Typography>
-          </Box>
-        </Box>
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="flex items-center gap-4">
+          <Button variant="outline" size="icon" onClick={() => navigate('/markets')}>
+            <ArrowLeft className="h-4 w-4" />
+          </Button>
+          <div>
+            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-2">
+              {ticker} <Badge variant="secondary" className="text-sm font-normal">{asset.name}</Badge>
+            </h1>
+          </div>
+        </div>
+        <div className="text-right">
+          <div className="text-3xl font-bold font-mono">${displayPrice.toFixed(2)}</div>
+          <div className={cn("flex items-center justify-end gap-1 font-medium", isPositive ? "text-emerald-500" : "text-red-500")}>
+            {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+            {isPositive ? "+" : ""}${priceChange.toFixed(2)} ({isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%)
+          </div>
+        </div>
+      </div>
 
-        {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-        <Box sx={{ textAlign: 'right' }}>
-          <Typography variant="h4" fontWeight="bold">
-            ${displayPrice.toFixed(2)}
-          </Typography>
-          {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-          <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, justifyContent: 'flex-end' }}>
-            {isPositive ? (
-              <TrendingUp color="success" fontSize="small" />
+      <div className="grid grid-cols-3 gap-4">
+        <Card className="bg-slate-50/50 dark:bg-slate-900/50">
+          <CardContent className="pt-6 flex items-center justify-between">
+            <div className="text-muted-foreground text-sm font-medium">Bid</div>
+            <div className="text-xl font-bold text-emerald-600">${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-50/50 dark:bg-slate-900/50">
+          <CardContent className="pt-6 flex items-center justify-between">
+            <div className="text-muted-foreground text-sm font-medium">Ask</div>
+            <div className="text-xl font-bold text-red-600">${askPrice > 0 ? askPrice.toFixed(2) : '--'}</div>
+          </CardContent>
+        </Card>
+        <Card className="bg-slate-50/50 dark:bg-slate-900/50">
+          <CardContent className="pt-6 flex items-center justify-between">
+            <div className="text-muted-foreground text-sm font-medium">Spread</div>
+            <div className="text-xl font-bold text-slate-700 dark:text-slate-300">
+              ${askPrice > 0 && bidPrice > 0 ? (askPrice - bidPrice).toFixed(2) : '--'}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Chart Section */}
+        <Card className="lg:col-span-2 flex flex-col min-h-[500px]">
+          <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4 border-b">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <BarChart2 className="h-4 w-4" /> Price Chart
+            </CardTitle>
+            <div className="flex bg-slate-100 dark:bg-slate-800 p-1 rounded-lg">
+              {(['1D', '1W', '1M', '3M', '1Y'] as const).map((tf) => (
+                <button
+                  key={tf}
+                  onClick={() => setTimeframe(tf)}
+                  className={cn(
+                    "px-3 py-1 text-xs font-medium rounded-md transition-all",
+                    timeframe === tf
+                      ? "bg-white dark:bg-slate-950 shadow-sm text-foreground"
+                      : "text-muted-foreground hover:text-foreground"
+                  )}
+                >
+                  {tf}
+                </button>
+              ))}
+            </div>
+          </CardHeader>
+          <CardContent className="flex-1 p-4">
+            {chartData.length > 0 ? (
+              // @ts-ignore - Chart.js financial plugin types
+              <Chart type="candlestick" data={memoizedChartData} options={chartOptions} />
             ) : (
-              <TrendingDown color="error" fontSize="small" />
+              <div className="flex flex-col items-center justify-center h-full text-muted-foreground gap-2">
+                <Activity className="h-8 w-8 opacity-20" />
+                <p>No chart data available for this timeframe</p>
+              </div>
             )}
-            <Typography
-              variant="body1"
-              color={isPositive ? 'success.main' : 'error.main'}
-              fontWeight="bold"
-            >
-              {isPositive ? '+' : ''}${priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)
-            </Typography>
-          </Box>
-        </Box>
-      </Box>
+          </CardContent>
+        </Card>
 
-      {/* Price Info */}
-      {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-      <Box sx={{ mb: 3, display: 'flex', gap: 3 }}>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Bid
-          </Typography>
-          <Typography variant="h6" fontWeight="bold" color="success.main">
-            ${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}
-          </Typography>
-        </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Ask
-          </Typography>
-          <Typography variant="h6" fontWeight="bold" color="error.main">
-            ${askPrice > 0 ? askPrice.toFixed(2) : '--'}
-          </Typography>
-        </Box>
-        <Box>
-          <Typography variant="caption" color="text.secondary">
-            Spread
-          </Typography>
-          <Typography variant="h6" fontWeight="bold">
-            ${askPrice > 0 && bidPrice > 0 ? (askPrice - bidPrice).toFixed(2) : '--'}
-          </Typography>
-        </Box>
-      </Box>
-
-      {/* Main Content */}
-      <Grid container spacing={3}>
-        {/* Chart - 65% width */}
-        <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 3, height: '600px' }}>
-            {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-            <Box sx={{ mb: 2, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Typography variant="h6" fontWeight="bold">
-                Price Chart
-              </Typography>
-              <ToggleButtonGroup
-                value={timeframe}
-                exclusive
-                onChange={handleTimeframeChange}
-                size="small"
-              >
-                <ToggleButton value="1D">1D</ToggleButton>
-                <ToggleButton value="1W">1W</ToggleButton>
-                <ToggleButton value="1M">1M</ToggleButton>
-                <ToggleButton value="3M">3M</ToggleButton>
-                <ToggleButton value="1Y">1Y</ToggleButton>
-              </ToggleButtonGroup>
-            </Box>
-            {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-            <Box sx={{ height: 'calc(100% - 60px)' }}>
-              {chartData.length > 0 ? (
-                // @ts-ignore - Chart.js financial plugin type definitions
-                <Chart type="candlestick" data={memoizedChartData} options={chartOptions} />
-              ) : (
-                <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100%' }}>
-                  <Typography color="text.secondary">No chart data available</Typography>
-                </Box>
-              )}
-            </Box>
-          </Paper>
-        </Grid>
-
-        {/* Trades - 35% width */}
-        <Grid item xs={12} md={4}>
-          {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-          <Paper sx={{ height: '600px', display: 'flex', flexDirection: 'column' }}>
-            <Box sx={{ p: 2, borderBottom: 1, borderColor: 'divider' }}>
-              <Typography variant="h6" fontWeight="bold">
-                Recent Trades
-              </Typography>
-              <Typography variant="caption" color="text.secondary">
-                Updates every 3 seconds
-              </Typography>
-            </Box>
-            <TableContainer sx={{ flexGrow: 1, overflow: 'auto' }}>
-              <Table stickyHeader size="small">
-                <TableHead>
+        {/* Trades Section */}
+        <Card className="flex flex-col h-[500px]">
+          <CardHeader className="border-b py-3">
+            <CardTitle className="text-base font-bold flex items-center gap-2">
+              <Clock className="h-4 w-4" /> Recent Trades
+            </CardTitle>
+            <CardDescription className="text-xs">Live market activity</CardDescription>
+          </CardHeader>
+          <CardContent className="p-0 overflow-y-auto flex-1">
+            <Table>
+              <TableHeader className="sticky top-0 bg-background z-10">
+                <TableRow>
+                  <TableHead className="w-[80px]">Time</TableHead>
+                  <TableHead className="text-right">Price</TableHead>
+                  <TableHead className="text-right">Size</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {memoizedTrades.length === 0 ? (
                   <TableRow>
-                    <TableCell><strong>Time</strong></TableCell>
-                    <TableCell align="right"><strong>Price</strong></TableCell>
-                    <TableCell align="right"><strong>Size</strong></TableCell>
-                    <TableCell><strong>Side</strong></TableCell>
+                    <TableCell colSpan={3} className="text-center h-32 text-muted-foreground">
+                      No recent trades
+                    </TableCell>
                   </TableRow>
-                </TableHead>
-                <TableBody>
-                  {memoizedTrades.length === 0 ? (
-                    <TableRow>
-                      <TableCell colSpan={4} align="center">
-                        <Typography variant="body2" color="text.secondary" py={4}>
-                          No trades yet
-                        </Typography>
+                ) : (
+                  memoizedTrades.map((trade) => (
+                    <TableRow key={trade.id} className="text-xs">
+                      <TableCell className="font-mono text-muted-foreground">
+                        {new Date(trade.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
+                      </TableCell>
+                      <TableCell className={cn("text-right font-bold", trade.side === 'BUY' ? "text-emerald-600" : "text-red-600")}>
+                        ${parseFloat(trade.price).toFixed(2)}
+                      </TableCell>
+                      <TableCell className="text-right font-mono">
+                        {parseFloat(trade.size).toFixed(2)}
                       </TableCell>
                     </TableRow>
-                  ) : (
-                    memoizedTrades.map((trade) => (
-                      <TableRow key={trade.id}>
-                        <TableCell>
-                          <Typography variant="caption">
-                            {new Date(trade.timestamp).toLocaleTimeString()}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography
-                            variant="body2"
-                            fontWeight="bold"
-                            color={trade.side === 'BUY' ? 'success.main' : 'error.main'}
-                          >
-                            ${parseFloat(trade.price).toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell align="right">
-                          <Typography variant="body2">
-                            {parseFloat(trade.size).toFixed(2)}
-                          </Typography>
-                        </TableCell>
-                        <TableCell>
-                          <Chip
-                            label={trade.side}
-                            size="small"
-                            color={trade.side === 'BUY' ? 'success' : 'error'}
-                            sx={{ fontSize: '0.7rem', height: '20px' }}
-                          />
-                        </TableCell>
-                      </TableRow>
-                    ))
-                  )}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          </Paper>
-        </Grid>
-      </Grid>
-    </Container>
+                  ))
+                )}
+              </TableBody>
+            </Table>
+          </CardContent>
+        </Card>
+      </div>
+    </div>
   );
 };
 

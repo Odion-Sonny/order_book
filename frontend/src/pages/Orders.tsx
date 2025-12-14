@@ -1,32 +1,35 @@
-/**
- * Orders Page
- * View and manage all orders
- */
-
 import React, { useState, useEffect } from 'react';
 import {
-  Container,
-  Paper,
-  Typography,
+  RefreshCw,
+  Trash2,
+  AlertCircle,
+  Clock,
+  CheckCircle2,
+  XCircle,
+  Ban,
+  Loader2
+} from 'lucide-react';
+import apiService, { Order } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import {
   Table,
   TableBody,
   TableCell,
-  TableContainer,
   TableHead,
+  TableHeader,
   TableRow,
-  Chip,
-  Button,
-  CircularProgress,
-  Alert,
-  Box,
-  IconButton,
+} from '@/components/ui/table';
+import {
   Dialog,
-  DialogTitle,
   DialogContent,
-  DialogActions,
-} from '@mui/material';
-import { Delete, Refresh } from '@mui/icons-material';
-import apiService, { Order } from '../services/api';
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { cn } from '@/lib/utils';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 
 const Orders: React.FC = () => {
   const [orders, setOrders] = useState<Order[]>([]);
@@ -78,114 +81,101 @@ const Orders: React.FC = () => {
     }
   };
 
-  const getStatusColor = (status: string): "default" | "primary" | "secondary" | "error" | "info" | "success" | "warning" => {
+  const getStatusBadge = (status: string) => {
     switch (status) {
       case 'PENDING':
-        return 'warning';
+        return <Badge variant="outline" className="bg-yellow-500/10 text-yellow-500 border-yellow-500/20"><Clock className="w-3 h-3 mr-1" /> Pending</Badge>;
       case 'FILLED':
-        return 'success';
+        return <Badge variant="outline" className="bg-emerald-500/10 text-emerald-500 border-emerald-500/20"><CheckCircle2 className="w-3 h-3 mr-1" /> Filled</Badge>;
       case 'CANCELLED':
+        return <Badge variant="outline" className="bg-slate-500/10 text-slate-500 border-slate-500/20"><Ban className="w-3 h-3 mr-1" /> Cancelled</Badge>;
       case 'REJECTED':
-        return 'error';
+        return <Badge variant="destructive"><XCircle className="w-3 h-3 mr-1" /> Rejected</Badge>;
       default:
-        return 'default';
+        return <Badge variant="secondary">{status}</Badge>;
     }
   };
 
-  if (loading) {
+  if (loading && orders.length === 0) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4" fontWeight="bold">
-          Orders
-        </Typography>
-        <Button
-          startIcon={<Refresh />}
-          onClick={fetchOrders}
-          variant="outlined"
-        >
-          Refresh
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Orders</h1>
+          <p className="text-muted-foreground">Manage your open and historical orders</p>
+        </div>
+        <Button variant="outline" onClick={fetchOrders} className="gap-2">
+          <RefreshCw className={cn("h-4 w-4", loading && "animate-spin")} /> Refresh
         </Button>
-      </Box>
+      </div>
 
       {error && (
-        <Alert severity="error" sx={{ mb: 3 }}>
+        <div className="bg-red-50 text-red-600 p-4 rounded-md border border-red-200 flex items-center gap-2">
+          <AlertCircle className="h-5 w-5" />
           {error}
-        </Alert>
+        </div>
       )}
 
-      <Paper>
-        <TableContainer>
+      <Card>
+        <CardHeader>
+          <CardTitle>Order History</CardTitle>
+        </CardHeader>
+        <CardContent>
           <Table>
-            <TableHead>
+            <TableHeader>
               <TableRow>
-                <TableCell><strong>ID</strong></TableCell>
-                <TableCell><strong>Symbol</strong></TableCell>
-                <TableCell><strong>Side</strong></TableCell>
-                <TableCell><strong>Type</strong></TableCell>
-                <TableCell align="right"><strong>Price</strong></TableCell>
-                <TableCell align="right"><strong>Size</strong></TableCell>
-                <TableCell><strong>Status</strong></TableCell>
-                <TableCell><strong>Created</strong></TableCell>
-                <TableCell><strong>Actions</strong></TableCell>
+                <TableHead>ID</TableHead>
+                <TableHead>Symbol</TableHead>
+                <TableHead>Side</TableHead>
+                <TableHead>Type</TableHead>
+                <TableHead className="text-right">Price</TableHead>
+                <TableHead className="text-right">Size</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead>Created</TableHead>
+                <TableHead>Actions</TableHead>
               </TableRow>
-            </TableHead>
+            </TableHeader>
             <TableBody>
               {orders.length === 0 ? (
                 <TableRow>
-                  <TableCell colSpan={9} align="center">
-                    <Typography color="text.secondary" py={4}>
-                      No orders yet. Place an order from the Markets page to see it here.
-                    </Typography>
+                  <TableCell colSpan={9} className="text-center h-32 text-muted-foreground">
+                    No orders found. Start trading in the Markets page.
                   </TableCell>
                 </TableRow>
               ) : (
                 orders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell>{order.id}</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{order.id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-medium">{order.asset_ticker}</TableCell>
                     <TableCell>
-                      <Typography fontWeight="bold">{order.asset_ticker || 'N/A'}</Typography>
+                      <Badge variant={order.side === 'BUY' ? 'default' : 'secondary'} className={order.side === 'SELL' ? 'bg-orange-500/10 text-orange-600 hover:bg-orange-500/20' : ''}>
+                        {order.side}
+                      </Badge>
                     </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={order.side}
-                        size="small"
-                        color={order.side === 'BUY' ? 'success' : 'error'}
-                      />
-                    </TableCell>
-                    <TableCell>{order.order_type}</TableCell>
-                    <TableCell align="right">
-                      ${parseFloat(order.price).toFixed(2)}
-                    </TableCell>
-                    <TableCell align="right">
-                      {parseFloat(order.size).toFixed(2)}
-                    </TableCell>
-                    <TableCell>
-                      <Chip
-                        label={order.status}
-                        size="small"
-                        color={getStatusColor(order.status)}
-                      />
-                    </TableCell>
-                    <TableCell>
+                    <TableCell className="text-xs uppercase">{order.order_type}</TableCell>
+                    <TableCell className="text-right font-medium">${parseFloat(order.price).toFixed(2)}</TableCell>
+                    <TableCell className="text-right">{parseFloat(order.size).toFixed(2)}</TableCell>
+                    <TableCell>{getStatusBadge(order.status)}</TableCell>
+                    <TableCell className="text-xs text-muted-foreground">
                       {new Date(order.created_at).toLocaleString()}
                     </TableCell>
                     <TableCell>
                       {order.status === 'PENDING' && (
-                        <IconButton
-                          size="small"
-                          color="error"
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-red-500 hover:bg-red-50 hover:text-red-600"
                           onClick={() => handleOpenCancelDialog(order)}
                         >
-                          <Delete />
-                        </IconButton>
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
                       )}
                     </TableCell>
                   </TableRow>
@@ -193,48 +183,46 @@ const Orders: React.FC = () => {
               )}
             </TableBody>
           </Table>
-        </TableContainer>
-      </Paper>
+        </CardContent>
+      </Card>
 
-      {/* Cancel Confirmation Dialog */}
-      <Dialog open={cancelDialogOpen} onClose={handleCloseCancelDialog}>
-        <DialogTitle>Cancel Order</DialogTitle>
+      {/* Cancel Dialog */}
+      <Dialog open={cancelDialogOpen} onOpenChange={setCancelDialogOpen}>
         <DialogContent>
-          <Typography>
-            Are you sure you want to cancel this order?
-          </Typography>
+          <DialogHeader>
+            <DialogTitle>Cancel Order?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to cancel this pending order?
+            </DialogDescription>
+          </DialogHeader>
+
           {selectedOrder && (
-            <Box sx={{ mt: 2 }}>
-              <Typography variant="body2">
-                <strong>Symbol:</strong> {selectedOrder.asset_ticker || 'N/A'}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Side:</strong> {selectedOrder.side}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Size:</strong> {selectedOrder.size}
-              </Typography>
-              <Typography variant="body2">
-                <strong>Price:</strong> ${parseFloat(selectedOrder.price).toFixed(2)}
-              </Typography>
-            </Box>
+            <div className="bg-slate-50 dark:bg-slate-900 p-4 rounded-md space-y-2 text-sm">
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Symbol:</span>
+                <span className="font-medium">{selectedOrder.asset_ticker}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Side:</span>
+                <span className="font-medium">{selectedOrder.side}</span>
+              </div>
+              <div className="flex justify-between">
+                <span className="text-muted-foreground">Amount:</span>
+                <span className="font-medium">{selectedOrder.size} @ ${parseFloat(selectedOrder.price).toFixed(2)}</span>
+              </div>
+            </div>
           )}
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseCancelDialog} disabled={cancelLoading}>No, Keep Order</Button>
+            <Button variant="destructive" onClick={handleCancelOrder} disabled={cancelLoading}>
+              {cancelLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Yes, Cancel Order
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseCancelDialog} disabled={cancelLoading}>
-            No
-          </Button>
-          <Button
-            onClick={handleCancelOrder}
-            variant="contained"
-            color="error"
-            disabled={cancelLoading}
-          >
-            {cancelLoading ? <CircularProgress size={24} /> : 'Yes, Cancel'}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   );
 };
 

@@ -1,56 +1,45 @@
-/**
- * Markets Page
- * Display available assets and market data with order placement
- */
-
 import React, { useState, useEffect } from 'react';
 import {
-  Container,
-  Grid,
-  Card,
-  CardContent,
-  Typography,
-  Box,
-  CircularProgress,
-  Alert,
-  Button,
-  Dialog,
-  DialogTitle,
-  DialogContent,
-  DialogActions,
-  TextField,
-  FormControl,
-  InputLabel,
-  Select,
-  MenuItem,
-  IconButton,
-} from '@mui/material';
-import { TrendingUp, TrendingDown, ShowChart, Add, Delete } from '@mui/icons-material';
+  TrendingUp,
+  TrendingDown,
+  LineChart,
+  Plus,
+  Trash2,
+  AlertCircle,
+  Loader2
+} from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import apiService, { Asset } from '../services/api';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription, CardFooter } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { cn } from '@/lib/utils';
 
 const Markets: React.FC = () => {
   const navigate = useNavigate();
   const [assets, setAssets] = useState<Asset[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Order Dialog State
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
-
-  // Add stock dialog state
-  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
-  const [newStockTicker, setNewStockTicker] = useState('');
-  const [newStockName, setNewStockName] = useState('');
-  const [addStockLoading, setAddStockLoading] = useState(false);
-  const [addStockError, setAddStockError] = useState('');
-  const [addStockSuccess, setAddStockSuccess] = useState('');
-
-  // Delete stock dialog state
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
-  const [deleteLoading, setDeleteLoading] = useState(false);
-
-  // Order form state
   const [side, setSide] = useState<'BUY' | 'SELL'>('BUY');
   const [orderType, setOrderType] = useState<'LIMIT' | 'MARKET' | 'STOP_LOSS'>('LIMIT');
   const [price, setPrice] = useState('');
@@ -59,9 +48,21 @@ const Markets: React.FC = () => {
   const [orderError, setOrderError] = useState('');
   const [orderSuccess, setOrderSuccess] = useState('');
 
+  // Add Stock Dialog State
+  const [addStockDialogOpen, setAddStockDialogOpen] = useState(false);
+  const [newStockTicker, setNewStockTicker] = useState('');
+  const [newStockName, setNewStockName] = useState('');
+  const [addStockLoading, setAddStockLoading] = useState(false);
+  const [addStockError, setAddStockError] = useState('');
+  const [addStockSuccess, setAddStockSuccess] = useState('');
+
+  // Delete Dialog State
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [assetToDelete, setAssetToDelete] = useState<Asset | null>(null);
+  const [deleteLoading, setDeleteLoading] = useState(false);
+
   useEffect(() => {
     fetchMarketData();
-    // Reduced from 1 second to 5 seconds to improve performance
     const interval = setInterval(fetchMarketData, 5000);
     return () => clearInterval(interval);
   }, []);
@@ -77,9 +78,6 @@ const Markets: React.FC = () => {
       setLoading(false);
     }
   };
-
-  // Memoize expensive calculations
-  const memoizedAssets = React.useMemo(() => assets, [assets]);
 
   const handleOpenOrderDialog = (asset: Asset) => {
     setSelectedAsset(asset);
@@ -128,22 +126,6 @@ const Markets: React.FC = () => {
     }
   };
 
-  const handleOpenAddStockDialog = () => {
-    setAddStockDialogOpen(true);
-    setNewStockTicker('');
-    setNewStockName('');
-    setAddStockError('');
-    setAddStockSuccess('');
-  };
-
-  const handleCloseAddStockDialog = () => {
-    setAddStockDialogOpen(false);
-    setNewStockTicker('');
-    setNewStockName('');
-    setAddStockError('');
-    setAddStockSuccess('');
-  };
-
   const handleAddStock = async () => {
     if (!newStockTicker.trim()) {
       setAddStockError('Please enter a stock ticker symbol');
@@ -162,42 +144,29 @@ const Markets: React.FC = () => {
       });
 
       setAddStockSuccess('Stock added successfully!');
-
-      // Refresh market data to include the new stock
-      await fetchMarketData();
-
+      fetchMarketData();
       setTimeout(() => {
-        handleCloseAddStockDialog();
+        setAddStockDialogOpen(false);
+        setNewStockTicker('');
+        setNewStockName('');
+        setAddStockError('');
+        setAddStockSuccess('');
       }, 1500);
     } catch (err: any) {
-      setAddStockError(err.message || 'Failed to add stock. It may already exist or be invalid.');
+      setAddStockError(err.message || 'Failed to add stock');
     } finally {
       setAddStockLoading(false);
     }
   };
 
-  const handleOpenDeleteDialog = (asset: Asset) => {
-    setAssetToDelete(asset);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleCloseDeleteDialog = () => {
-    setDeleteDialogOpen(false);
-    setAssetToDelete(null);
-  };
-
   const handleDeleteStock = async () => {
     if (!assetToDelete) return;
-
     setDeleteLoading(true);
-
     try {
       await apiService.deleteAsset(assetToDelete.id);
-
-      // Refresh market data to remove the deleted stock
-      await fetchMarketData();
-
-      handleCloseDeleteDialog();
+      fetchMarketData();
+      setDeleteDialogOpen(false);
+      setAssetToDelete(null);
     } catch (err: any) {
       setError(err.message || 'Failed to delete stock');
     } finally {
@@ -207,44 +176,35 @@ const Markets: React.FC = () => {
 
   if (loading) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4, display: 'flex', justifyContent: 'center', alignItems: 'center', minHeight: '60vh' }}>
-        <CircularProgress />
-      </Container>
+      <div className="flex justify-center items-center min-h-[50vh]">
+        <div className="h-8 w-8 animate-spin rounded-full border-4 border-primary border-t-transparent" />
+      </div>
     );
   }
 
   if (error) {
     return (
-      <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-        <Alert severity="error">{error}</Alert>
-      </Container>
+      <div className="p-4 bg-red-50 text-red-600 rounded-md border border-red-200 flex items-center gap-2">
+        <AlertCircle className="h-5 w-5" />
+        {error}
+      </div>
     );
   }
 
   return (
-    <Container maxWidth="lg" sx={{ mt: 4, mb: 4 }}>
-      {/* @ts-ignore - MUI v5 known TypeScript issue with complex sx props */}
-      <Box sx={{ mb: 4, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-        <Box>
-          <Typography variant="h4" gutterBottom fontWeight="bold">
-            Markets
-          </Typography>
-          <Typography variant="body1" color="text.secondary">
-            Real-time market data and order placement
-          </Typography>
-        </Box>
-        <Button
-          variant="contained"
-          startIcon={<Add />}
-          onClick={handleOpenAddStockDialog}
-          sx={{ mt: 1 }}
-        >
-          Add Stock
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div className="space-y-1">
+          <h1 className="text-3xl font-bold tracking-tight">Markets</h1>
+          <p className="text-muted-foreground">Real-time quotes and trading</p>
+        </div>
+        <Button onClick={() => setAddStockDialogOpen(true)} className="gap-2">
+          <Plus className="h-4 w-4" /> Add Stock
         </Button>
-      </Box>
+      </div>
 
-      <Grid container spacing={3}>
-        {memoizedAssets.map((asset) => {
+      <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+        {assets.map((asset) => {
           const currentPrice = parseFloat(String(asset.current_price || '0'));
           const bidPrice = parseFloat(String(asset.bid_price || '0'));
           const askPrice = parseFloat(String(asset.ask_price || '0'));
@@ -255,299 +215,228 @@ const Markets: React.FC = () => {
           const isPositive = priceChange >= 0;
 
           return (
-            <Grid item xs={12} sm={6} md={4} key={asset.id}>
-              <Card
-                sx={{
-                  height: '100%',
-                  display: 'flex',
-                  flexDirection: 'column',
-                  transition: 'transform 0.2s, box-shadow 0.2s',
-                  cursor: 'pointer',
-                  '&:hover': {
-                    transform: 'translateY(-4px)',
-                    boxShadow: 4,
-                  },
-                }}
-                onClick={() => navigate(`/stock/${asset.ticker}`)}
-              >
-                <CardContent sx={{ flexGrow: 1 }}>
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'start', mb: 2 }}>
-                    <div>
-                      <Typography variant="h6" fontWeight="bold">
-                        {asset.ticker}
-                      </Typography>
-                      <Typography variant="body2" color="text.secondary">
-                        {asset.name}
-                      </Typography>
-                    </div>
-                    <Box sx={{ display: 'flex', gap: 1 }}>
-                      <ShowChart color="primary" />
-                      <IconButton
-                        size="small"
-                        color="error"
-                        onClick={(e) => {
-                          e.stopPropagation();
-                          handleOpenDeleteDialog(asset);
-                        }}
-                        sx={{ ml: 1 }}
-                      >
-                        <Delete fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </Box>
-
-                  {displayPrice > 0 && (
-                    <>
-                      <Typography variant="h5" fontWeight="bold" sx={{ mb: 1 }}>
-                        ${displayPrice.toFixed(2)}
-                      </Typography>
-
-                      {(priceChange !== 0 || priceChangePercent !== 0) && (
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 2 }}>
-                          {isPositive ? (
-                            <TrendingUp color="success" fontSize="small" />
-                          ) : (
-                            <TrendingDown color="error" fontSize="small" />
-                          )}
-                          <Typography
-                            variant="body2"
-                            color={isPositive ? 'success.main' : 'error.main'}
-                            fontWeight="bold"
-                          >
-                            {isPositive ? '+' : ''}${priceChange.toFixed(2)} ({isPositive ? '+' : ''}{priceChangePercent.toFixed(2)}%)
-                          </Typography>
-                        </Box>
-                      )}
-                    </>
-                  )}
-
-                  <Box sx={{ display: 'flex', justifyContent: 'space-between', mb: 2 }}>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Bid
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" color="success.main">
-                        ${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}
-                      </Typography>
-                    </Box>
-                    <Box>
-                      <Typography variant="caption" color="text.secondary">
-                        Ask
-                      </Typography>
-                      <Typography variant="body2" fontWeight="bold" color="error.main">
-                        ${askPrice > 0 ? askPrice.toFixed(2) : '--'}
-                      </Typography>
-                    </Box>
-                  </Box>
-
+            <Card key={asset.id} className="cursor-pointer hover:shadow-md transition-shadow" onClick={() => navigate(`/stock/${asset.ticker}`)}>
+              <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-2">
+                <div>
+                  <CardTitle className="text-xl font-bold">{asset.ticker}</CardTitle>
+                  <CardDescription>{asset.name}</CardDescription>
+                </div>
+                <div className="flex gap-2">
+                  <LineChart className="h-5 w-5 text-muted-foreground" />
                   <Button
-                    fullWidth
-                    variant="contained"
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6 text-muted-foreground hover:text-red-500 hover:bg-red-50"
                     onClick={(e) => {
                       e.stopPropagation();
-                      handleOpenOrderDialog(asset);
+                      setAssetToDelete(asset);
+                      setDeleteDialogOpen(true);
                     }}
                   >
-                    Trade
+                    <Trash2 className="h-4 w-4" />
                   </Button>
-                </CardContent>
-              </Card>
-            </Grid>
+                </div>
+              </CardHeader>
+              <CardContent>
+                <div className="space-y-4">
+                  {displayPrice > 0 ? (
+                    <div>
+                      <div className="text-2xl font-bold">${displayPrice.toFixed(2)}</div>
+                      {(priceChange !== 0 || priceChangePercent !== 0) && (
+                        <div className={cn("flex items-center gap-1 text-sm font-medium", isPositive ? "text-emerald-500" : "text-red-500")}>
+                          {isPositive ? <TrendingUp className="h-4 w-4" /> : <TrendingDown className="h-4 w-4" />}
+                          {isPositive ? "+" : ""}${priceChange.toFixed(2)} ({isPositive ? "+" : ""}{priceChangePercent.toFixed(2)}%)
+                        </div>
+                      )}
+                    </div>
+                  ) : (
+                    <div className="text-muted-foreground text-sm">Price unavailable</div>
+                  )}
+
+                  <div className="flex justify-between text-sm">
+                    <div>
+                      <span className="text-muted-foreground block text-xs">Bid</span>
+                      <span className="font-medium text-emerald-600">${bidPrice > 0 ? bidPrice.toFixed(2) : '--'}</span>
+                    </div>
+                    <div className="text-right">
+                      <span className="text-muted-foreground block text-xs">Ask</span>
+                      <span className="font-medium text-red-600">${askPrice > 0 ? askPrice.toFixed(2) : '--'}</span>
+                    </div>
+                  </div>
+                </div>
+              </CardContent>
+              <CardFooter>
+                <Button
+                  className="w-full"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenOrderDialog(asset);
+                  }}
+                >
+                  Trade
+                </Button>
+              </CardFooter>
+            </Card>
           );
         })}
-      </Grid>
+      </div>
 
       {assets.length === 0 && (
-        <Box sx={{ textAlign: 'center', py: 8 }}>
-          <ShowChart sx={{ fontSize: 60, color: 'text.secondary', mb: 2 }} />
-          <Typography variant="h6" color="text.secondary">
-            No market data available
-          </Typography>
-        </Box>
+        <div className="text-center py-10 text-muted-foreground">
+          <LineChart className="mx-auto h-10 w-10 mb-3 opacity-20" />
+          <p>No stocks available. Add one to get started.</p>
+        </div>
       )}
 
-      {/* Order Placement Dialog */}
-      <Dialog open={orderDialogOpen} onClose={handleCloseOrderDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Place Order - {selectedAsset?.ticker}
-        </DialogTitle>
-        <DialogContent>
+      {/* Order Dialog */}
+      <Dialog open={orderDialogOpen} onOpenChange={setOrderDialogOpen}>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Place Order - {selectedAsset?.ticker}</DialogTitle>
+            <DialogDescription>
+              Execute a trade for {selectedAsset?.name}
+            </DialogDescription>
+          </DialogHeader>
+
           {orderError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {orderError}
-            </Alert>
+            <div className="bg-red-50 text-red-600 p-2 rounded text-sm flex gap-2 items-center">
+              <AlertCircle className="h-4 w-4" /> {orderError}
+            </div>
           )}
-
           {orderSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
+            <div className="bg-emerald-50 text-emerald-600 p-2 rounded text-sm">
               {orderSuccess}
-            </Alert>
+            </div>
           )}
 
-          <Grid container spacing={2} sx={{ mt: 1 }}>
-            <Grid item xs={6}>
-              <FormControl fullWidth>
-                <InputLabel>Side</InputLabel>
-                <Select
-                  value={side}
-                  label="Side"
-                  onChange={(e) => setSide(e.target.value as 'BUY' | 'SELL')}
-                >
-                  <MenuItem value="BUY">Buy</MenuItem>
-                  <MenuItem value="SELL">Sell</MenuItem>
+          <div className="grid gap-4 py-4">
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label>Side</Label>
+                <Select value={side} onValueChange={(v: any) => setSide(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="BUY">Buy</SelectItem>
+                    <SelectItem value="SELL">Sell</SelectItem>
+                  </SelectContent>
                 </Select>
-              </FormControl>
-            </Grid>
-
-            <Grid item xs={6}>
-              <FormControl fullWidth>
-                <InputLabel>Order Type</InputLabel>
-                <Select
-                  value={orderType}
-                  label="Order Type"
-                  onChange={(e) => setOrderType(e.target.value as any)}
-                >
-                  <MenuItem value="LIMIT">Limit</MenuItem>
-                  <MenuItem value="MARKET">Market</MenuItem>
-                  <MenuItem value="STOP_LOSS">Stop Loss</MenuItem>
+              </div>
+              <div className="space-y-2">
+                <Label>Type</Label>
+                <Select value={orderType} onValueChange={(v: any) => setOrderType(v)}>
+                  <SelectTrigger>
+                    <SelectValue />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="LIMIT">Limit</SelectItem>
+                    <SelectItem value="MARKET">Market</SelectItem>
+                    <SelectItem value="STOP_LOSS">Stop Loss</SelectItem>
+                  </SelectContent>
                 </Select>
-              </FormControl>
-            </Grid>
+              </div>
+            </div>
 
-            <Grid item xs={12}>
-              <TextField
-                fullWidth
-                label="Size (Quantity)"
+            <div className="space-y-2">
+              <Label>Quantity</Label>
+              <Input
                 type="number"
                 value={size}
                 onChange={(e) => setSize(e.target.value)}
-                inputProps={{ min: 0, step: 0.01 }}
+                min="0"
+                step="0.01"
               />
-            </Grid>
+            </div>
 
             {orderType !== 'MARKET' && (
-              <Grid item xs={12}>
-                <TextField
-                  fullWidth
-                  label="Price"
+              <div className="space-y-2">
+                <Label>Price</Label>
+                <Input
                   type="number"
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
-                  inputProps={{ min: 0, step: 0.01 }}
+                  min="0"
+                  step="0.01"
                 />
-              </Grid>
+              </div>
             )}
 
-            <Grid item xs={12}>
-              <Typography variant="body2" color="text.secondary">
-                Estimated Total: ${(parseFloat(size || '0') * parseFloat(price || '0')).toFixed(2)}
-              </Typography>
-            </Grid>
-          </Grid>
+            <div className="text-xs text-muted-foreground text-center">
+              Estimated Total: <span className="font-medium text-foreground">${(parseFloat(size || '0') * parseFloat(price || '0')).toFixed(2)}</span>
+            </div>
+          </div>
+
+          <DialogFooter>
+            <Button variant="outline" onClick={handleCloseOrderDialog} disabled={orderLoading}>Cancel</Button>
+            <Button onClick={handlePlaceOrder} disabled={orderLoading || !size || (orderType !== 'MARKET' && !price)}>
+              {orderLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              {side === 'BUY' ? 'Buy' : 'Sell'} {selectedAsset?.ticker}
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseOrderDialog} disabled={orderLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handlePlaceOrder}
-            variant="contained"
-            disabled={orderLoading || !size || (orderType !== 'MARKET' && !price)}
-          >
-            {orderLoading ? <CircularProgress size={24} /> : 'Place Order'}
-          </Button>
-        </DialogActions>
       </Dialog>
 
       {/* Add Stock Dialog */}
-      <Dialog open={addStockDialogOpen} onClose={handleCloseAddStockDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Add New Stock
-        </DialogTitle>
+      <Dialog open={addStockDialogOpen} onOpenChange={setAddStockDialogOpen}>
         <DialogContent>
-          {addStockError && (
-            <Alert severity="error" sx={{ mb: 2 }}>
-              {addStockError}
-            </Alert>
-          )}
+          <DialogHeader>
+            <DialogTitle>Add New Stock</DialogTitle>
+            <DialogDescription>Add a stock to your watchlist to track and trade.</DialogDescription>
+          </DialogHeader>
 
-          {addStockSuccess && (
-            <Alert severity="success" sx={{ mb: 2 }}>
-              {addStockSuccess}
-            </Alert>
-          )}
+          {addStockError && <div className="text-red-500 text-sm mb-2">{addStockError}</div>}
+          {addStockSuccess && <div className="text-emerald-500 text-sm mb-2">{addStockSuccess}</div>}
 
-          <Box sx={{ mt: 2 }}>
-            <TextField
-              fullWidth
-              label="Stock Ticker Symbol"
-              placeholder="e.g., TSLA, MSFT, GOOGL"
-              value={newStockTicker}
-              onChange={(e) => setNewStockTicker(e.target.value.toUpperCase())}
-              margin="normal"
-              helperText="Enter the stock ticker symbol (e.g., AAPL for Apple Inc.)"
-              autoFocus
-            />
-
-            <TextField
-              fullWidth
-              label="Stock Name (Optional)"
-              placeholder="e.g., Tesla Inc."
-              value={newStockName}
-              onChange={(e) => setNewStockName(e.target.value)}
-              margin="normal"
-              helperText="Stock name will be auto-filled if left blank"
-            />
-
-            <Alert severity="info" sx={{ mt: 2 }}>
-              The stock will be added to your market watchlist and real-time data will be fetched from Alpaca.
-            </Alert>
-          </Box>
+          <div className="grid gap-4 py-4">
+            <div className="space-y-2">
+              <Label htmlFor="ticker">Ticker Symbol</Label>
+              <Input
+                id="ticker"
+                placeholder="e.g. AAPL, TSLA"
+                value={newStockTicker}
+                onChange={(e) => setNewStockTicker(e.target.value.toUpperCase())}
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="name">Company Name (Optional)</Label>
+              <Input
+                id="name"
+                placeholder="e.g. Apple Inc."
+                value={newStockName}
+                onChange={(e) => setNewStockName(e.target.value)}
+              />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setAddStockDialogOpen(false)}>Cancel</Button>
+            <Button onClick={handleAddStock} disabled={addStockLoading || !newStockTicker}>
+              {addStockLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Add Stock
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseAddStockDialog} disabled={addStockLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleAddStock}
-            variant="contained"
-            disabled={addStockLoading || !newStockTicker.trim()}
-            startIcon={addStockLoading ? <CircularProgress size={20} /> : <Add />}
-          >
-            {addStockLoading ? 'Adding...' : 'Add Stock'}
-          </Button>
-        </DialogActions>
       </Dialog>
 
-      {/* Delete Stock Confirmation Dialog */}
-      <Dialog open={deleteDialogOpen} onClose={handleCloseDeleteDialog} maxWidth="sm" fullWidth>
-        <DialogTitle>
-          Remove Stock
-        </DialogTitle>
+      {/* Delete Confirmation */}
+      <Dialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
         <DialogContent>
-          <Typography>
-            Are you sure you want to remove <strong>{assetToDelete?.ticker}</strong> ({assetToDelete?.name}) from your watchlist?
-          </Typography>
-          <Alert severity="warning" sx={{ mt: 2 }}>
-            This will remove the stock from your markets page. Any existing orders or positions for this stock will not be affected.
-          </Alert>
+          <DialogHeader>
+            <DialogTitle>Remove {assetToDelete?.ticker}?</DialogTitle>
+            <DialogDescription>
+              Are you sure you want to remove this stock from your watchlist? This action cannot be undone.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDeleteDialogOpen(false)}>Cancel</Button>
+            <Button variant="destructive" onClick={handleDeleteStock} disabled={deleteLoading}>
+              {deleteLoading && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+              Remove
+            </Button>
+          </DialogFooter>
         </DialogContent>
-        <DialogActions>
-          <Button onClick={handleCloseDeleteDialog} disabled={deleteLoading}>
-            Cancel
-          </Button>
-          <Button
-            onClick={handleDeleteStock}
-            variant="contained"
-            color="error"
-            disabled={deleteLoading}
-            startIcon={deleteLoading ? <CircularProgress size={20} /> : <Delete />}
-          >
-            {deleteLoading ? 'Removing...' : 'Remove Stock'}
-          </Button>
-        </DialogActions>
       </Dialog>
-    </Container>
+    </div>
   );
 };
 
