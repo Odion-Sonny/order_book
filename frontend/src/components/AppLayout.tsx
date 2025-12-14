@@ -57,7 +57,7 @@ const AppLayout: React.FC<AppLayoutProps> = ({ children }) => {
         {menuItems.map((item) => (
           <Button
             key={item.path}
-            variant={location.pathname === item.path ? "translucent" : "ghost"}
+            variant="ghost"
             className={cn(
               "w-full justify-start gap-3 h-12 text-sm font-medium",
               location.pathname === item.path

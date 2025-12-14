@@ -152,7 +152,7 @@ const Orders: React.FC = () => {
               ) : (
                 orders.map((order) => (
                   <TableRow key={order.id}>
-                    <TableCell className="font-mono text-xs text-muted-foreground">{order.id.slice(0, 8)}...</TableCell>
+                    <TableCell className="font-mono text-xs text-muted-foreground">{String(order.id).slice(0, 8)}...</TableCell>
                     <TableCell className="font-medium">{order.asset_ticker}</TableCell>
                     <TableCell>
                       <Badge variant={order.side === 'BUY' ? 'default' : 'secondary'} className={order.side === 'SELL' ? 'bg-orange-500/10 text-orange-600 hover:bg-orange-500/20' : ''}>
