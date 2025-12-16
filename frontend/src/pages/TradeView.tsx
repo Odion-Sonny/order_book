@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
-import type { Asset, Order } from '@/types';
-import { ArrowUpRight, ArrowDownRight, RefreshCcw } from 'lucide-react';
+import type { Asset } from '@/types';
+
 import { cn } from '@/lib/utils';
-import { useNavigate } from 'react-router-dom';
+
 
 const TradeView = () => {
-    const navigate = useNavigate();
+    useNavigate(); // Keep hook if needed for side effects, or remove entirely if navigation logic was removed. Actually, let's remove it if unused.
     const [assets, setAssets] = useState<Asset[]>([]);
     const [selectedTicker, setSelectedTicker] = useState<string>('AAPL');
     const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');

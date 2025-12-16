@@ -9,7 +9,7 @@ import {
     Wallet
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+
 
 const SidebarItem = ({ to, icon: Icon, label }: { to: string; icon: any; label: string }) => {
     return (

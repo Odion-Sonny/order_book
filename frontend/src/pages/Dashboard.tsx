@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Portfolio, Position } from '@/types';
-import { ArrowUpRight, ArrowDownRight, Wallet, Activity, DollarSign } from 'lucide-react';
+import { Wallet, Activity, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 const StatCard = ({ title, value, subtext, icon: Icon, trend }: { title: string, value: string, subtext: string, icon: any, trend?: 'up' | 'down' }) => (
