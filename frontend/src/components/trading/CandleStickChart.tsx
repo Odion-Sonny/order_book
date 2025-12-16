@@ -17,7 +17,8 @@ interface ChartData {
 }
 
 const CustomCandle = (props: any) => {
-    const { x, y, width, height, low, high, open, close } = props;
+    const { x, y, width, height, payload } = props;
+    const { open, close, low, high } = payload;
     const isUp = close >= open;
     const color = isUp ? '#10B981' : '#EF4444'; // Emerald-500 : Red-500
     // range provided is [min, max]
