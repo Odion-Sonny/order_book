@@ -1,8 +1,7 @@
 import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Portfolio as PortfolioType, Position } from '@/types';
-import { PieChart, Wallet, TrendingUp } from 'lucide-react';
-import { cn } from '@/lib/utils';
+import { PieChart, Wallet } from 'lucide-react';
 
 const Portfolio = () => {
     const [portfolio, setPortfolio] = useState<PortfolioType | null>(null);

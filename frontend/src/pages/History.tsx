@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Order, Trade } from '@/types';
 import { cn } from '@/lib/utils';
-import { format } from 'date-fns';
+
 
 const StatusBadge = ({ status }: { status: string }) => {
     const styles: Record<string, string> = {
@@ -22,7 +22,7 @@ const History = () => {
     const [view, setView] = useState<'ORDERS' | 'TRADES'>('ORDERS');
     const [orders, setOrders] = useState<Order[]>([]);
     const [trades, setTrades] = useState<Trade[]>([]);
-    const [loading, setLoading] = useState(true);
+    // const [loading, setLoading] = useState(true); // Unused currently in render, keeping fetch effect simple
 
     useEffect(() => {
         const fetchHistory = async () => {
@@ -36,7 +36,7 @@ const History = () => {
             } catch (error) {
                 console.error("Failed to history", error);
             } finally {
-                setLoading(false);
+                // setLoading(false); 
             }
         };
         fetchHistory();
@@ -85,7 +85,7 @@ const History = () => {
                         {view === 'ORDERS' ? (
                             orders.map(order => (
                                 <tr key={order.id} className="hover:bg-[#2C2C2E]">
-                                    <td className="px-6 py-4 font-mono text-neutral-500">{order.id.slice(0, 8)}</td>
+                                    <td className="px-6 py-4 font-mono text-neutral-500">{String(order.id).slice(0, 8)}</td>
                                     <td className="px-6 py-4 font-bold text-white">{order.asset_ticker}</td>
                                     <td className={cn("px-6 py-4 font-bold", order.side === 'BUY' ? "text-emerald-500" : "text-red-500")}>{order.side}</td>
                                     <td className="px-6 py-4 text-neutral-400">{order.order_type}</td>

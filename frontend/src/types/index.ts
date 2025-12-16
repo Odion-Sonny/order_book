@@ -35,7 +35,7 @@ export interface Position {
 }
 
 export interface Order {
-    id: number;
+    id: string; // Changed to match UUID usage
     portfolio: number;
     asset: number;
     asset_ticker: string;
@@ -49,10 +49,11 @@ export interface Order {
 }
 
 export interface Trade {
-    id: number;
+    id: string; // Changed to string based on usage slice(0,8)
+    order_id: string;
     asset_ticker: string;
     price: string;
-    size: string;
+    quantity: string; // Renamed from size or added
     side: 'BUY' | 'SELL';
     timestamp: string;
 }
