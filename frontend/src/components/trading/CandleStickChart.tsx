@@ -4,8 +4,7 @@ import {
     YAxis,
     Tooltip,
     ResponsiveContainer,
-    Bar,
-    Cell
+    Bar
 } from 'recharts';
 import { format } from 'date-fns';
 
@@ -21,57 +20,24 @@ const CustomCandle = (props: any) => {
     const { x, y, width, height, low, high, open, close } = props;
     const isUp = close >= open;
     const color = isUp ? '#10B981' : '#EF4444'; // Emerald-500 : Red-500
-    const ratio = Math.abs(high - low) === 0 ? 1 : height / Math.abs(high - low);
-
-    // Calculate wick positions
-    const yHigh = y + (high - Math.max(open, close)) * ratio; // Recharts Y is inverted? No, usually y is top.
-    // Actually Recharts passes calculated x/y/height for the Bar.
-    // But for a custom shape we need the raw data values usually or access the scale.
-    // Let's try simpler: Recharts custom shape usually gets pixel values. 
-    // However, exact pixel mapping for OHLC in a Bar is tricky.
-    // Better approach: Use ErrorBar? Or just simplified drawing relative to the "Bar" rect which represents the body?
-    // Wait, standard trick: 
-    // The Bar value can be [min(open,close), max(open,close)]. 
-    // Then we draw the wick line separately as an ErrorBar or custom shape.
-
-    // Let's use a simpler known method for Recharts OHLC:
-    // Pass full OHLC object to shape.
-    // But x, y, width, height provided by Bar are for the "value" passed to <Bar dataKey />.
-    // If we pass [low, high] to dataKey, Bar covers the whole range.
-    // Then we draw the body inside.
-
-    // Coordinates calculation:
-    // Recharts scales value to pixels.
-    const yBottom = y + height;
-    const yTop = y;
-
-    // We need pixel positions for Open and Close.
-    // This requires access to the YAxis scale, which custom shape props might not fully expose easily without context.
-    // ALTERNATIVE: Calculate wicks relative to the bar height? 
-
-    // PROVEN METHOD: 
-    // We won't use Bar's auto-calc for logic. We use it for x/width placement.
-    // We will trust 'y' and 'height' correspond to the [min, max] range if we provide that as data.
-    // So dataKey={[low, high]}.
-
-    // Then we need to know where 'open' and 'close' fall within [low, high].
+    // range provided is [min, max]
     const range = high - low;
     const boxTopVal = Math.max(open, close);
     const boxBottomVal = Math.min(open, close);
 
+    // Pixel Calculation relative to the Bar height
     const pixelHeight = height;
     const pixelPerUnit = range === 0 ? 0 : pixelHeight / range;
 
-    // Top of chart is y=0 (usually). So higher value = smaller y pixel.
-    // properties 'y' is the top pixel of the bar (the 'high' value).
-    // properties 'height' is the length of the bar (high - low).
+    // Bar rect 'y' is the top visual coordinate (high value)
+    // Bar rect 'height' is visual height (high - low)
 
     const wickTop = y;
     const wickBottom = y + height;
     const wickX = x + width / 2;
 
     const bodyTop = y + (high - boxTopVal) * pixelPerUnit;
-    const bodyHeight = Math.max(2, (boxTopVal - boxBottomVal) * pixelPerUnit); // Min 2px for visibility
+    const bodyHeight = Math.max(2, (boxTopVal - boxBottomVal) * pixelPerUnit);
 
     return (
         <g>
