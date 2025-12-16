@@ -28,7 +28,7 @@ class OrderSerializer(serializers.ModelSerializer):
         model = Order
         fields = ['id', 'user', 'asset', 'asset_ticker', 'price', 'size', 'order_type', 'side',
                  'status', 'created_at', 'updated_at', 'executed_at']
-        read_only_fields = ['status', 'created_at', 'updated_at', 'executed_at', 'user']
+        read_only_fields = ['status', 'created_at', 'updated_at', 'executed_at', 'user', 'asset']
 
 
 class OrderBookSerializer(serializers.ModelSerializer):

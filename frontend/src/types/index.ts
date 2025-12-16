@@ -37,7 +37,7 @@ export interface Position {
 export interface Order {
     id: string; // Changed to match UUID usage
     portfolio: number;
-    asset: number;
+    asset: number | string;
     asset_ticker: string;
     side: 'BUY' | 'SELL';
     order_type: 'MARKET' | 'LIMIT' | 'STOP';

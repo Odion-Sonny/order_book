@@ -611,13 +611,13 @@ def trades_list(request):
             for t in local_trades_data:
                 formatted_trades.append({
                     'id': str(t['id']),
-                    'asset': t['asset_ticker'],
+                    'asset_ticker': t['asset_ticker'],
                     'price': t['price'],
-                    'size': t['size'],
+                    'quantity': t['size'],
                     'volume': float(t['price']) * float(t['size']),
                     'timestamp': t['executed_at'],
-                    'side': 'BUY' if t['buy_order'] else 'SELL', # Actually it's a match, side is relative. matching_engine logic implies taker side usually.
-                    'type': 'LIMIT' # mostly
+                    'side': 'BUY' if t['buy_order'] else 'SELL',
+                    'type': 'LIMIT'
                 })
             return Response(formatted_trades)
 

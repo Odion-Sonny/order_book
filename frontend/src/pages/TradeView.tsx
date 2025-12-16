@@ -157,7 +157,7 @@ const TradeView = () => {
 
         try {
             await apiService.createOrder({
-                asset_ticker: selectedTicker,
+                asset: selectedTicker,
                 side,
                 order_type: orderType,
                 quantity,
