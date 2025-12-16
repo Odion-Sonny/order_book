@@ -1,4 +1,4 @@
-import { createChart, ColorType, IChartApi } from 'lightweight-charts';
+import { createChart, ColorType, type IChartApi } from 'lightweight-charts';
 import { useEffect, useRef } from 'react';
 
 export interface ChartData {

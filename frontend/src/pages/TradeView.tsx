@@ -1,8 +1,8 @@
-import { useEffect, useState, useMemo } from 'react';
+import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Asset, Trade } from '@/types';
 import { cn } from '@/lib/utils';
-import { PriceChart, ChartData } from '@/components/trading/PriceChart';
+import { PriceChart, type ChartData } from '@/components/trading/PriceChart';
 
 const TradeView = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
