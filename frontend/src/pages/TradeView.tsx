@@ -6,7 +6,6 @@ import { cn } from '@/lib/utils';
 
 
 const TradeView = () => {
-    useNavigate(); // Keep hook if needed for side effects, or remove entirely if navigation logic was removed. Actually, let's remove it if unused.
     const [assets, setAssets] = useState<Asset[]>([]);
     const [selectedTicker, setSelectedTicker] = useState<string>('AAPL');
     const [orderType, setOrderType] = useState<'MARKET' | 'LIMIT'>('MARKET');
