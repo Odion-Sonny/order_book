@@ -4,16 +4,23 @@ import Dashboard from '@/pages/Dashboard';
 import Markets from '@/pages/Markets';
 import TradeView from '@/pages/TradeView';
 
+import Login from '@/pages/Login';
+import ProtectedRoute from '@/components/ProtectedRoute';
+
 function App() {
   return (
     <BrowserRouter>
       <Routes>
-        <Route element={<AppLayout />}>
-          <Route path="/" element={<Dashboard />} />
-          <Route path="/trade" element={<TradeView />} />
-          <Route path="/markets" element={<Markets />} />
-          {/* Catch all redirect to dashboard */}
-          <Route path="*" element={<Navigate to="/" replace />} />
+        <Route path="/login" element={<Login />} />
+
+        <Route element={<ProtectedRoute />}>
+          <Route element={<AppLayout />}>
+            <Route path="/" element={<Dashboard />} />
+            <Route path="/trade" element={<TradeView />} />
+            <Route path="/markets" element={<Markets />} />
+            {/* Catch all redirect to dashboard */}
+            <Route path="*" element={<Navigate to="/" replace />} />
+          </Route>
         </Route>
       </Routes>
     </BrowserRouter>

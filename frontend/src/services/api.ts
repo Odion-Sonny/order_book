@@ -11,6 +11,27 @@ const api = axios.create({
     },
 });
 
+// Request interceptor to add auth token
+api.interceptors.request.use((config) => {
+    const token = localStorage.getItem('accessToken');
+    if (token) {
+        config.headers.Authorization = `Bearer ${token}`;
+    }
+    return config;
+}, (error) => Promise.reject(error));
+
+// Response interceptor to handle 401s
+api.interceptors.response.use(
+    (response) => response,
+    (error) => {
+        if (error.response?.status === 401) {
+            localStorage.removeItem('accessToken'); // Clear invalid token
+            window.location.href = '/login'; // Force redirect
+        }
+        return Promise.reject(error);
+    }
+);
+
 export const apiService = {
     // Assets
     getAssets: async (): Promise<Asset[]> => {
