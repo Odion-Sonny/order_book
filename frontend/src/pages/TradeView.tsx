@@ -1,9 +1,8 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useState, useMemo } from 'react';
 import { apiService } from '@/services/api';
-import type { Asset } from '@/types';
-
+import type { Asset, Trade } from '@/types';
 import { cn } from '@/lib/utils';
-
+import { PriceChart, ChartData } from '@/components/trading/PriceChart';
 
 const TradeView = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
@@ -14,6 +13,10 @@ const TradeView = () => {
     const [price, setPrice] = useState<string>('');
     const [loading, setLoading] = useState(false);
     const [statusData, setStatusData] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
+
+    // Chart State
+    const [trades, setTrades] = useState<Trade[]>([]);
+    const [chartData, setChartData] = useState<ChartData[]>([]);
 
     // Fetch assets on mount
     useEffect(() => {
@@ -26,6 +29,70 @@ const TradeView = () => {
     }, []);
 
     const selectedAsset = assets.find(a => a.ticker === selectedTicker);
+
+    // Fetch Trades for Chart
+    useEffect(() => {
+        const loadTrades = async () => {
+            if (!selectedTicker) return;
+            try {
+                // In a real app, we'd pass ?ticker={selectedTicker} to filter on backend
+                const allTrades = await apiService.getTrades();
+                const assetTrades = allTrades
+                    .filter(t => t.asset_ticker === selectedTicker)
+                    .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
+                setTrades(assetTrades);
+            } catch (e) {
+                console.error("Failed to load trades for chart", e);
+            }
+        };
+
+        loadTrades();
+        const interval = setInterval(loadTrades, 5000); // Poll for updates
+        return () => clearInterval(interval);
+    }, [selectedTicker]);
+
+    // Aggregate Trades into Candles
+    useEffect(() => {
+        if (trades.length === 0) {
+            // If no trades, show current price as a flat line or single candle
+            if (selectedAsset?.current_price) {
+                const price = parseFloat(selectedAsset.current_price);
+                const today = new Date().toISOString().split('T')[0];
+                setChartData([
+                    { time: today, open: price, high: price, low: price, close: price }
+                ]);
+            }
+            return;
+        }
+
+        // Simple aggregation logic (DAILY for simplicity, or minute if timestamps allow)
+        // Group by Date (YYYY-MM-DD)
+        const groups: Record<string, Trade[]> = {};
+        trades.forEach(t => {
+            // Use date string for daily keys. For minute, use HH:mm
+            const date = t.timestamp.split('T')[0];
+            if (!groups[date]) groups[date] = [];
+            groups[date].push(t);
+        });
+
+        const candles: ChartData[] = Object.keys(groups).map(date => {
+            const group = groups[date];
+            const prices = group.map(t => parseFloat(t.price));
+            return {
+                time: date,
+                open: prices[0],
+                high: Math.max(...prices),
+                low: Math.min(...prices),
+                close: prices[prices.length - 1]
+            };
+        });
+
+        // Ensure sorted by time
+        candles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+        setChartData(candles);
+
+    }, [trades, selectedAsset]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -41,9 +108,7 @@ const TradeView = () => {
                 price: orderType === 'LIMIT' ? price : undefined
             });
             setStatusData({ msg: 'Order Placed Successfully', type: 'success' });
-            // Reset form
             setQuantity('');
-            // Optional: navigate or refresh
         } catch (error: any) {
             console.error("Order failed", error);
             setStatusData({ msg: 'Order Failed: ' + (error.response?.data?.detail || 'Unknown error'), type: 'error' });
@@ -75,12 +140,14 @@ const TradeView = () => {
                     </div>
                 </div>
 
-                {/* Chart Area (Placeholder) */}
-                <div className="bg-card border border-border rounded-xl flex-1 p-6 relative flex items-center justify-center shadow-sm">
-                    <div className="text-center">
-                        <div className="text-6xl mb-4 opacity-10">📈</div>
-                        <h3 className="text-xl font-bold text-neutral-500">Chart Visualization</h3>
-                        <p className="text-sm text-neutral-600">TradingView Chart Integration Coming Soon</p>
+                {/* Chart Area */}
+                <div className="bg-card border border-border rounded-xl flex-1 p-1 relative flex flex-col shadow-sm overflow-hidden">
+                    <div className="p-4 border-b border-border flex justify-between items-center">
+                        <h3 className="font-bold text-neutral-400 text-sm">Created from Order Book Data</h3>
+                        {trades.length === 0 && <span className="text-xs text-yellow-500">Waiting for trades...</span>}
+                    </div>
+                    <div className="flex-1 w-full bg-black relative">
+                        <PriceChart data={chartData} />
                     </div>
                 </div>
             </div>
