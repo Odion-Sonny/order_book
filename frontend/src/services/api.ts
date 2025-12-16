@@ -85,11 +85,8 @@ export const apiService = {
         // Checking router in urls.py: router.register(r'orderbooks', OrderBookViewSet, basename='orderbook')
         // Standard ViewSet retrieval usually involves ID, but custom lookup might be supported.
         // Let's try query param filter first which is safest for ViewSets.
-        const response = await api.get(`/orderbooks/?asset_ticker=${ticker}`);
-        // If that fails we might need custom logic, but standard filtering is common.
-        // Alternatively, if it's a detail route: api.get(`/orderbooks/${ticker}/`)
-        // Let's assume standard list filtering for now.
-        return response.data.results || response.data;
+        const response = await api.get(`/orderbooks/by_ticker/?ticker=${ticker}`);
+        return response.data; // Response is directly the object { bids, asks }
     },
 };
 
