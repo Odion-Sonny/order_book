@@ -2,7 +2,17 @@ import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Asset, Trade } from '@/types';
 import { cn } from '@/lib/utils';
-import { PriceChart, type ChartData } from '@/components/trading/PriceChart';
+import { CandleStickChart } from '@/components/trading/CandleStickChart';
+import { MarketDepthChart } from '@/components/trading/MarketDepthChart';
+import { BarChart3, Layers } from 'lucide-react';
+
+interface ChartData {
+    time: string;
+    open: number;
+    high: number;
+    low: number;
+    close: number;
+}
 
 const TradeView = () => {
     const [assets, setAssets] = useState<Asset[]>([]);
@@ -14,9 +24,16 @@ const TradeView = () => {
     const [loading, setLoading] = useState(false);
     const [statusData, setStatusData] = useState<{ msg: string, type: 'success' | 'error' } | null>(null);
 
-    // Chart State
+    // View Mode
+    const [chartMode, setChartMode] = useState<'PRICE' | 'DEPTH'>('PRICE');
+
+    // Chart Data
     const [trades, setTrades] = useState<Trade[]>([]);
     const [chartData, setChartData] = useState<ChartData[]>([]);
+
+    // Order Book Data
+    const [bids, setBids] = useState<any[]>([]);
+    const [asks, setAsks] = useState<any[]>([]);
 
     // Fetch assets on mount
     useEffect(() => {
@@ -30,31 +47,74 @@ const TradeView = () => {
 
     const selectedAsset = assets.find(a => a.ticker === selectedTicker);
 
-    // Fetch Trades for Chart
+    // Fetch Data Poll
     useEffect(() => {
-        const loadTrades = async () => {
-            if (!selectedTicker) return;
+        if (!selectedTicker) return;
+
+        const fetchData = async () => {
             try {
-                // In a real app, we'd pass ?ticker={selectedTicker} to filter on backend
+                // 1. Get Trades for Price Chart
                 const allTrades = await apiService.getTrades();
                 const assetTrades = allTrades
                     .filter(t => t.asset_ticker === selectedTicker)
                     .sort((a, b) => new Date(a.timestamp).getTime() - new Date(b.timestamp).getTime());
                 setTrades(assetTrades);
+
+                // 2. Get Order Book for Depth Chart
+                // Assuming backend returns { bids: [], asks: [] } or list of orders to aggregate
+                // If API returns raw orders, we aggregate here. If it returns depth structure, we use it.
+                // Let's assume for now it returns a list of orders (since OrderBookViewSet might be simple)
+                // We'll aggregate manually if needed, or check structure.
+                // Safest bet: Fetch raw orders for this asset and build the book if getOrderBook returns simple list.
+                const bookData: any = await apiService.getOrderBook(selectedTicker);
+
+                // Process Book Data (Generic handler assuming generic list or {bids, asks})
+                let rawBids: any[] = [];
+                let rawAsks: any[] = [];
+
+                if (bookData.bids && bookData.asks) {
+                    rawBids = bookData.bids;
+                    rawAsks = bookData.asks;
+                } else if (Array.isArray(bookData)) {
+                    // It's a list of orders?
+                    rawBids = bookData.filter((o: any) => o.side === 'BUY');
+                    rawAsks = bookData.filter((o: any) => o.side === 'SELL');
+                }
+
+                // Aggregate for Chart (Cumulative Sum)
+                // 1. Sort
+                rawBids.sort((a: any, b: any) => parseFloat(b.price) - parseFloat(a.price)); // Desc
+                rawAsks.sort((a: any, b: any) => parseFloat(a.price) - parseFloat(b.price)); // Asc
+
+                // 2. Cumulative
+                let bidSum = 0;
+                const aggBids = rawBids.map((b: any) => {
+                    bidSum += parseFloat(b.quantity || b.size || '0');
+                    return { price: parseFloat(b.price), quantity: parseFloat(b.quantity || b.size || '0'), total: bidSum };
+                });
+
+                let askSum = 0;
+                const aggAsks = rawAsks.map((a: any) => {
+                    askSum += parseFloat(a.quantity || a.size || '0');
+                    return { price: parseFloat(a.price), quantity: parseFloat(a.quantity || a.size || '0'), total: askSum };
+                });
+
+                setBids(aggBids);
+                setAsks(aggAsks);
+
             } catch (e) {
-                console.error("Failed to load trades for chart", e);
+                console.error("Failed to load chart data", e);
             }
         };
 
-        loadTrades();
-        const interval = setInterval(loadTrades, 5000); // Poll for updates
+        fetchData();
+        const interval = setInterval(fetchData, 3000);
         return () => clearInterval(interval);
     }, [selectedTicker]);
 
     // Aggregate Trades into Candles
     useEffect(() => {
         if (trades.length === 0) {
-            // If no trades, show current price as a flat line or single candle
             if (selectedAsset?.current_price) {
                 const price = parseFloat(selectedAsset.current_price);
                 const today = new Date().toISOString().split('T')[0];
@@ -65,11 +125,8 @@ const TradeView = () => {
             return;
         }
 
-        // Simple aggregation logic (DAILY for simplicity, or minute if timestamps allow)
-        // Group by Date (YYYY-MM-DD)
         const groups: Record<string, Trade[]> = {};
         trades.forEach(t => {
-            // Use date string for daily keys. For minute, use HH:mm
             const date = t.timestamp.split('T')[0];
             if (!groups[date]) groups[date] = [];
             groups[date].push(t);
@@ -87,7 +144,6 @@ const TradeView = () => {
             };
         });
 
-        // Ensure sorted by time
         candles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
         setChartData(candles);
 
@@ -138,16 +194,43 @@ const TradeView = () => {
                             <div className="text-2xl font-mono font-bold text-white mt-1">${parseFloat(selectedAsset?.current_price || '0').toFixed(2)}</div>
                         </div>
                     </div>
+
+                    {/* Chart Toggles */}
+                    <div className="flex bg-[#2C2C2E] rounded-lg p-1 border border-border">
+                        <button
+                            onClick={() => setChartMode('PRICE')}
+                            className={cn("p-2 rounded flex items-center gap-2 text-xs font-bold transition-all", chartMode === 'PRICE' ? "bg-neutral-600 text-white shadow" : "text-neutral-400 hover:text-white")}
+                        >
+                            <BarChart3 className="w-4 h-4" /> Price
+                        </button>
+                        <button
+                            onClick={() => setChartMode('DEPTH')}
+                            className={cn("p-2 rounded flex items-center gap-2 text-xs font-bold transition-all", chartMode === 'DEPTH' ? "bg-neutral-600 text-white shadow" : "text-neutral-400 hover:text-white")}
+                        >
+                            <Layers className="w-4 h-4" /> Depth
+                        </button>
+                    </div>
                 </div>
 
                 {/* Chart Area */}
-                <div className="bg-card border border-border rounded-xl flex-1 p-1 relative flex flex-col shadow-sm overflow-hidden">
+                <div className="bg-card border border-border rounded-xl flex-1 p-1 relative flex flex-col shadow-sm overflow-hidden min-h-[400px]">
                     <div className="p-4 border-b border-border flex justify-between items-center">
-                        <h3 className="font-bold text-neutral-400 text-sm">Created from Order Book Data</h3>
-                        {trades.length === 0 && <span className="text-xs text-yellow-500">Waiting for trades...</span>}
+                        <h3 className="font-bold text-neutral-400 text-sm">
+                            {chartMode === 'PRICE' ? 'Price History (from Trades)' : 'Order Book Depth (from Active Orders)'}
+                        </h3>
                     </div>
-                    <div className="flex-1 w-full bg-black relative">
-                        <PriceChart data={chartData} />
+                    <div className="flex-1 w-full bg-black relative p-2">
+                        {chartMode === 'PRICE' ? (
+                            <CandleStickChart data={chartData} />
+                        ) : (
+                            <MarketDepthChart bids={bids} asks={asks} />
+                        )}
+
+                        {chartMode === 'DEPTH' && bids.length === 0 && asks.length === 0 && (
+                            <div className="absolute inset-0 flex items-center justify-center text-neutral-500 text-sm">
+                                Empty Order Book. Place Limit orders to see depth.
+                            </div>
+                        )}
                     </div>
                 </div>
             </div>
