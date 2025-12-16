@@ -6,7 +6,7 @@ import {
     ResponsiveContainer,
     Bar
 } from 'recharts';
-import { format } from 'date-fns';
+
 
 interface ChartData {
     time: string;
