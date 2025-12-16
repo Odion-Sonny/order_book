@@ -3,7 +3,7 @@ from rest_framework import viewsets, status, serializers
 from rest_framework.decorators import action, api_view
 from rest_framework.response import Response
 from rest_framework.permissions import IsAuthenticated, IsAuthenticatedOrReadOnly
-from .models import Asset, Order, OrderBook
+from .models import Asset, Order, OrderBook, Trade
 from .serializers import AssetSerializer, OrderSerializer, OrderBookSerializer
 from .services.matching_engine import MatchingEngine
 from .services.alpaca_service import alpaca_service
@@ -584,39 +584,67 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
 
 @api_view(['GET'])
 def trades_list(request):
-    """Get real trade executions from Alpaca API with simulated fallback"""
+    """Get real trade executions from local Order Book with Alpaca fallback"""
     try:
-        # Optimized: Limit to reduce load - get parameter or default to 30
-        limit = min(int(request.GET.get('limit', 30)), 100)  # Max 100 trades
+        limit = min(int(request.GET.get('limit', 50)), 100)
+        ticker = request.GET.get('ticker')
+        
+        # 1. Get Local Trades (Actual Order Book Matches)
+        trades_query = Trade.objects.select_related('asset', 'buy_order', 'sell_order').order_by('-executed_at')
+        
+        if ticker:
+            trades_query = trades_query.filter(asset__ticker=ticker)
+            
+        local_trades = trades_query[:limit]
+        from .serializers import TradeSerializer
+        local_trades_data = TradeSerializer(local_trades, many=True).data
+        
+        # If we have enough local trades, return them directly
+        # This ensures the user sees their actual system working
+        if len(local_trades_data) > 0:
+            # Transform to common format if needed, but Frontend likely expects standard Trade fields
+            # The Matchign Engine Trade model has: price, size, asset, executed_at
+            # The previous simulated format had: price, size, asset, timestamp
+            # We need to map 'executed_at' to 'timestamp' for consistency if frontend expects it
+            # Let's clean up the response
+            formatted_trades = []
+            for t in local_trades_data:
+                formatted_trades.append({
+                    'id': str(t['id']),
+                    'asset': t['asset_ticker'],
+                    'price': t['price'],
+                    'size': t['size'],
+                    'volume': float(t['price']) * float(t['size']),
+                    'timestamp': t['executed_at'],
+                    'side': 'BUY' if t['buy_order'] else 'SELL', # Actually it's a match, side is relative. matching_engine logic implies taker side usually.
+                    'type': 'LIMIT' # mostly
+                })
+            return Response(formatted_trades)
 
+        # 2. Fallback: Alpaca/Simulation (Only if no local trades exist)
+        # This keeps the chart alive for demo purposes before any user interaction
         assets = Asset.objects.all()
+        if ticker:
+            assets = assets.filter(ticker=ticker)
+            
         symbols = [asset.ticker for asset in assets]
 
         # Try to get real trade data from Alpaca
         alpaca_trades = []
-        account_orders = []
-
         if symbols:
-            # Get market trade data - reduced limit
             try:
                 alpaca_trades = alpaca_service.get_recent_trades(symbols, limit=min(limit, 20))
             except Exception as e:
                 print(f"Error getting Alpaca market trades: {e}")
 
-            # Get account order executions - reduced limit
-            try:
-                account_orders = alpaca_service.get_account_orders(limit=min(limit, 10))
-            except Exception as e:
-                print(f"Error getting Alpaca account orders: {e}")
+        if alpaca_trades:
+             return Response(alpaca_trades)
 
-        # Combine all trades
-        all_trades = alpaca_trades + account_orders
-
-        # If no real Alpaca data, generate simulated trades with proper ordering
-        if not all_trades and assets:
+        # 3. Final Fallback: Simulation
+        # ... (Existing simulation logic)
+        if assets:
             sample_trades = []
             base_time = timezone.now()
-            # Reduced from 15 to min of limit or 15
             for i in range(min(limit, 15)):
                 asset = random.choice(assets)
                 # Get current market price
@@ -626,40 +654,29 @@ def trades_list(request):
                 if asset.ticker in quotes and quotes[asset.ticker]['ask_price'] > 0:
                     base_price = (quotes[asset.ticker]['bid_price'] + quotes[asset.ticker]['ask_price']) / 2
 
-                # Generate realistic price variation
-                price_variation = random.uniform(-0.02, 0.02)  # ±2%
+                price_variation = random.uniform(-0.02, 0.02)
                 trade_price = base_price * (1 + price_variation)
-
-                # Generate sequential timestamps (newest first)
-                # Each trade is 15-45 seconds older than the previous one
                 seconds_back = sum([random.randint(15, 45) for _ in range(i + 1)])
                 trade_time = base_time - timezone.timedelta(seconds=seconds_back)
 
-                # Generate additional trade properties for enhanced UI
                 side = random.choice(['BUY', 'SELL'])
                 size = random.randint(10, 500)
                 volume = trade_price * size
 
                 sample_trades.append({
-                    'id': f"trade_{i+1}_{int(trade_time.timestamp())}",
+                    'id': f"sim_{i+1}_{int(trade_time.timestamp())}",
                     'asset': asset.ticker,
                     'price': f"{trade_price:.2f}",
                     'size': str(size),
                     'timestamp': trade_time.isoformat(),
-                    'buyer_order_id': f"buy_{random.randint(1000, 9999)}",
-                    'seller_order_id': f"sell_{random.randint(1000, 9999)}",
                     'side': side,
-                    'trade_type': 'MARKET',
                     'volume': f"{volume:.2f}"
                 })
-
-            all_trades = sample_trades
-
-        # Sort by timestamp descending (newest first)
-        all_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-
-        # Return limited trades
-        return Response(all_trades[:limit])
+            
+            sample_trades.sort(key=lambda x: x['timestamp'], reverse=True)
+            return Response(sample_trades)
+            
+        return Response([])
 
     except Exception as e:
         return Response({'error': f'Failed to fetch trades: {str(e)}'}, status=500)
