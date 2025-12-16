@@ -4,6 +4,25 @@ import type { Portfolio, Position } from '@/types';
 import { ArrowUpRight, ArrowDownRight, Wallet, Activity, DollarSign } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
+const StatCard = ({ title, value, subtext, icon: Icon, trend }: { title: string, value: string, subtext: string, icon: any, trend?: 'up' | 'down' }) => (
+    <div className="bg-card border border-border rounded-xl p-6 shadow-sm hover:border-neutral-600 transition-colors">
+        <div className="flex items-start justify-between">
+            <div>
+                <p className="text-sm font-medium text-muted-foreground uppercase tracking-wider">{title}</p>
+                <div className="text-3xl font-bold text-foreground mt-2 font-mono tracking-tight">{value}</div>
+                <p className={cn("text-xs mt-2 font-medium flex items-center gap-1",
+                    trend === 'up' ? "text-emerald-500" : trend === 'down' ? "text-red-500" : "text-neutral-500"
+                )}>
+                    {subtext}
+                </p>
+            </div>
+            <div className="p-3 bg-neutral-900 rounded-lg border border-neutral-800 text-neutral-400">
+                <Icon className="h-6 w-6" />
+            </div>
+        </div>
+    </div>
+);
+
 const Dashboard = () => {
     const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
     const [positions, setPositions] = useState<Position[]>([]);
@@ -26,86 +45,63 @@ const Dashboard = () => {
         };
 
         fetchData();
-        const interval = setInterval(fetchData, 10000); // Poll every 10s
+        const interval = setInterval(fetchData, 10000);
         return () => clearInterval(interval);
     }, []);
 
     if (loading) {
-        return <div className="flex items-center justify-center h-96 text-muted-foreground animate-pulse">Loading market data...</div>;
+        return <div className="flex items-center justify-center h-full text-neutral-500">Loading Market Data...</div>;
     }
 
     const totalPnL = positions.reduce((acc, pos) => acc + parseFloat(pos.unrealized_pnl || '0'), 0);
     const isProfitable = totalPnL >= 0;
 
     return (
-        <div className="space-y-8 animate-in fade-in duration-500">
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight text-white mb-2">Portfolio Overview</h1>
-                <p className="text-muted-foreground">Real-time asset performance across all markets.</p>
-            </div>
-
+        <div className="space-y-6 max-w-7xl mx-auto">
+            {/* Stats Grid */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                <div className="relative overflow-hidden rounded-xl bg-card border border-white/5 p-6 shadow-xl glass-card group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Wallet className="h-24 w-24 -mr-8 -mt-8" />
-                    </div>
-                    <h3 className="text-muted-foreground text-sm font-medium uppercase tracking-wider">Total Liquidity</h3>
-                    <div className="text-3xl font-bold mt-2 text-white font-mono">
-                        ${portfolio ? parseFloat(portfolio.total_value).toFixed(2) : '0.00'}
-                    </div>
-                    <div className="mt-4 text-xs text-muted-foreground">
-                        Cash: <span className="text-foreground">${portfolio ? parseFloat(portfolio.cash_balance).toFixed(2) : '0.00'}</span>
-                    </div>
-                </div>
-
-                <div className="relative overflow-hidden rounded-xl bg-card border border-white/5 p-6 shadow-xl glass-card group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <Activity className="h-24 w-24 -mr-8 -mt-8" />
-                    </div>
-                    <h3 className="text-muted-foreground text-sm font-medium uppercase tracking-wider">Net P&L</h3>
-                    <div className={cn("text-3xl font-bold mt-2 font-mono flex items-center gap-2", isProfitable ? "text-emerald-400" : "text-red-400")}>
-                        {isProfitable ? "+" : ""}${Math.abs(totalPnL).toFixed(2)}
-                        {isProfitable ? <ArrowUpRight className="h-6 w-6" /> : <ArrowDownRight className="h-6 w-6" />}
-                    </div>
-                    <div className="mt-4 text-xs text-muted-foreground">
-                        Unrealized Gains
-                    </div>
-                </div>
-
-                <div className="relative overflow-hidden rounded-xl bg-card border border-white/5 p-6 shadow-xl glass-card group">
-                    <div className="absolute top-0 right-0 p-4 opacity-10 group-hover:opacity-20 transition-opacity">
-                        <DollarSign className="h-24 w-24 -mr-8 -mt-8" />
-                    </div>
-                    <h3 className="text-muted-foreground text-sm font-medium uppercase tracking-wider">Buying Power</h3>
-                    <div className="text-3xl font-bold mt-2 text-white font-mono">
-                        ${portfolio ? parseFloat(portfolio.buying_power).toFixed(2) : '0.00'}
-                    </div>
-                    <div className="mt-4 text-xs text-emerald-400">
-                        Ready to trade
-                    </div>
-                </div>
+                <StatCard
+                    title="Total Balance"
+                    value={`$${portfolio ? parseFloat(portfolio.total_value).toFixed(2) : '0.00'}`}
+                    subtext={`Cash: $${portfolio ? parseFloat(portfolio.cash_balance).toFixed(2) : '0.00'}`}
+                    icon={Wallet}
+                />
+                <StatCard
+                    title="Net P&L"
+                    value={`${isProfitable ? '+' : ''}$${Math.abs(totalPnL).toFixed(2)}`}
+                    subtext="Unrealized Gains"
+                    icon={Activity}
+                    trend={isProfitable ? 'up' : 'down'}
+                />
+                <StatCard
+                    title="Buying Power"
+                    value={`$${portfolio ? parseFloat(portfolio.buying_power).toFixed(2) : '0.00'}`}
+                    subtext="Available Margin"
+                    icon={DollarSign}
+                />
             </div>
 
-            <div className="rounded-xl border border-white/5 bg-card/50 backdrop-blur-sm overflow-hidden">
-                <div className="p-6 border-b border-white/5">
-                    <h3 className="font-semibold text-lg">Active Positions</h3>
+            {/* Positions Table - High Contrast */}
+            <div className="bg-card border border-border rounded-xl overflow-hidden shadow-sm">
+                <div className="px-6 py-5 border-b border-border flex items-center justify-between">
+                    <h3 className="font-semibold text-lg text-foreground">Active Positions</h3>
                 </div>
-                <div className="w-full overflow-x-auto">
+                <div className="overflow-x-auto">
                     <table className="w-full text-sm text-left">
-                        <thead className="bg-white/5 text-muted-foreground uppercase text-xs">
+                        <thead className="bg-[#151516] text-neutral-400 uppercase text-xs font-semibold tracking-wider">
                             <tr>
-                                <th className="px-6 py-4 font-medium">Asset</th>
-                                <th className="px-6 py-4 font-medium text-right">Qty</th>
-                                <th className="px-6 py-4 font-medium text-right">Avg Price</th>
-                                <th className="px-6 py-4 font-medium text-right">Market Price</th>
-                                <th className="px-6 py-4 font-medium text-right">Market Value</th>
-                                <th className="px-6 py-4 font-medium text-right">P&L</th>
+                                <th className="px-6 py-4">Asset</th>
+                                <th className="px-6 py-4 text-right">Qty</th>
+                                <th className="px-6 py-4 text-right">Avg Cost</th>
+                                <th className="px-6 py-4 text-right">Current</th>
+                                <th className="px-6 py-4 text-right">Value</th>
+                                <th className="px-6 py-4 text-right">P&L</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/5">
+                        <tbody className="divide-y divide-[#333333]">
                             {positions.length === 0 ? (
                                 <tr>
-                                    <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
+                                    <td colSpan={6} className="px-6 py-12 text-center text-neutral-500">
                                         No active positions
                                     </td>
                                 </tr>
@@ -114,13 +110,13 @@ const Dashboard = () => {
                                     const pnl = parseFloat(pos.unrealized_pnl);
                                     const isPosProfitable = pnl >= 0;
                                     return (
-                                        <tr key={pos.id} className="hover:bg-white/5 transition-colors group">
-                                            <td className="px-6 py-4 font-bold text-white group-hover:text-primary transition-colors">{pos.asset_ticker}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-muted-foreground">{parseFloat(pos.quantity).toFixed(4)}</td>
-                                            <td className="px-6 py-4 text-right font-mono text-muted-foreground">${parseFloat(pos.average_cost).toFixed(2)}</td>
+                                        <tr key={pos.id} className="hover:bg-[#2C2C2E] transition-colors">
+                                            <td className="px-6 py-4 font-bold text-white">{pos.asset_ticker}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-neutral-300">{parseFloat(pos.quantity).toFixed(4)}</td>
+                                            <td className="px-6 py-4 text-right font-mono text-neutral-300">${parseFloat(pos.average_cost).toFixed(2)}</td>
                                             <td className="px-6 py-4 text-right font-mono text-white">${parseFloat(pos.current_price).toFixed(2)}</td>
                                             <td className="px-6 py-4 text-right font-mono text-white">${parseFloat(pos.market_value).toFixed(2)}</td>
-                                            <td className={cn("px-6 py-4 text-right font-mono font-bold", isPosProfitable ? "text-emerald-400" : "text-red-400")}>
+                                            <td className={cn("px-6 py-4 text-right font-mono font-bold", isPosProfitable ? "text-emerald-500" : "text-red-500")}>
                                                 {isPosProfitable ? "+" : ""}${pnl.toFixed(2)}
                                             </td>
                                         </tr>
