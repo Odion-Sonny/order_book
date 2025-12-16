@@ -7,6 +7,9 @@ import TradeView from '@/pages/TradeView';
 import Login from '@/pages/Login';
 import ProtectedRoute from '@/components/ProtectedRoute';
 
+import Portfolio from '@/pages/Portfolio';
+import History from '@/pages/History';
+
 function App() {
   return (
     <BrowserRouter>
@@ -17,6 +20,8 @@ function App() {
           <Route element={<AppLayout />}>
             <Route path="/" element={<Dashboard />} />
             <Route path="/trade" element={<TradeView />} />
+            <Route path="/portfolio" element={<Portfolio />} />
+            <Route path="/history" element={<History />} />
             <Route path="/markets" element={<Markets />} />
             {/* Catch all redirect to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />
