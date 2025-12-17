@@ -360,112 +360,101 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
             depth_levels = int(request.query_params.get('levels', 10))
             
             # Get pending orders for this asset
-            bids = Order.objects.filter(
+            # 1. Fetch Local Orders
+            local_bids = list(Order.objects.filter(
                 asset=order_book.asset,
                 side='BUY',
                 status='PENDING'
-            ).values('price').annotate(
-                total_size=Sum('size')
-            ).order_by('-price')[:depth_levels]
+            ).values('price').annotate(total_size=Sum('size')))
             
-            asks = Order.objects.filter(
+            local_asks = list(Order.objects.filter(
                 asset=order_book.asset,
                 side='SELL',
                 status='PENDING'
-            ).values('price').annotate(
-                total_size=Sum('size')
-            ).order_by('price')[:depth_levels]
+            ).values('price').annotate(total_size=Sum('size')))
+
+            # 2. Fetch Alpaca "Background" Liquidity
+            alpaca_bids = []
+            alpaca_asks = []
+            market_data = {}
             
-            # If no orders exist, generate realistic market depth from Alpaca quotes
-            if not bids and not asks:
+            try:
                 quotes = alpaca_service.get_latest_quotes([ticker])
-                
                 if ticker in quotes and quotes[ticker]['ask_price'] > 0:
-                    bid_price = quotes[ticker]['bid_price']
-                    ask_price = quotes[ticker]['ask_price']
+                    market_data = quotes[ticker]
+                    bid_price = market_data['bid_price']
+                    ask_price = market_data['ask_price']
                     spread = ask_price - bid_price
-                    mid_price = (bid_price + ask_price) / 2
                     
-                    # Generate realistic order book depth around market price
-                    bid_list = []
-                    ask_list = []
-                    
-                    # Create 10 levels of bids below market price
+                    # Generate 10 levels of background depth
                     for i in range(10):
-                        level_price = bid_price - (spread * 0.1 * i)
-                        # Generate realistic size based on distance from market
-                        base_size = random.randint(50, 500)
-                        size_multiplier = 1 + (i * 0.3)  # Larger sizes further from market
-                        level_size = int(base_size * size_multiplier)
-                        running_total = sum(bid['size'] for bid in bid_list) + level_size
-                        
-                        bid_list.append({
-                            'price': round(level_price, 2),
-                            'size': level_size,
-                            'total': round(running_total * level_price, 2)
+                        # Bids
+                        p_bid = bid_price - (spread * 0.1 * i)
+                        alpaca_bids.append({
+                            'price': float(round(p_bid, 2)),
+                            'total_size': float(int(market_data['bid_size'] * (1 + i*0.2))) # Simulated depth
                         })
-                    
-                    # Create 10 levels of asks above market price  
-                    for i in range(10):
-                        level_price = ask_price + (spread * 0.1 * i)
-                        base_size = random.randint(50, 500)
-                        size_multiplier = 1 + (i * 0.3)
-                        level_size = int(base_size * size_multiplier)
-                        running_total = sum(ask['size'] for ask in ask_list) + level_size
                         
-                        ask_list.insert(0, {  # Insert at beginning to maintain price order
-                            'price': round(level_price, 2),
-                            'size': level_size,
-                            'total': round(running_total * level_price, 2)
+                        # Asks
+                        p_ask = ask_price + (spread * 0.1 * i)
+                        alpaca_asks.append({
+                            'price': float(round(p_ask, 2)),
+                            'total_size': float(int(market_data['ask_size'] * (1 + i*0.2)))
                         })
-                    
-                    return Response({
-                        'bids': bid_list,
-                        'asks': ask_list,
-                        'last_price': mid_price,
-                        'ticker': ticker,
-                        'market_data': {
-                            'bid_price': quotes[ticker]['bid_price'],
-                            'ask_price': quotes[ticker]['ask_price'],
-                            'bid_size': quotes[ticker]['bid_size'],
-                            'ask_size': quotes[ticker]['ask_size']
-                        }
-                    })
-                else:
-                    return Response({
-                        'bids': [],
-                        'asks': [],
-                        'last_price': 0,
-                        'ticker': ticker,
-                        'message': 'No real market data available'
-                    })
+            except Exception as e:
+                print(f"Alpaca fetch failed: {e}")
+
+            # 3. Merge and Sort
+            # Combine
+            all_bids = []
+            for b in local_bids:
+                all_bids.append({'price': float(b['price']), 'size': float(b['total_size']), 'source': 'local'})
+            for b in alpaca_bids:
+                all_bids.append({'price': b['price'], 'size': b['total_size'], 'source': 'market'})
+                
+            all_asks = []
+            for a in local_asks:
+                all_asks.append({'price': float(a['price']), 'size': float(a['total_size']), 'source': 'local'})
+            for a in alpaca_asks:
+                all_asks.append({'price': a['price'], 'size': a['total_size'], 'source': 'market'})
+
+            # Sort
+            # Bids: Descending Price
+            all_bids.sort(key=lambda x: x['price'], reverse=True)
+            # Asks: Ascending Price
+            all_asks.sort(key=lambda x: x['price'])
             
-            # Calculate cumulative totals for real orders
-            bid_list = []
-            running_bid_total = 0
-            for bid in bids:
-                running_bid_total += float(bid['total_size'])
-                bid_list.append({
-                    'price': float(bid['price']),
-                    'size': float(bid['total_size']),
-                    'total': round(running_bid_total * float(bid['price']), 2)
+            # Slice to requested depth
+            final_bids = all_bids[:depth_levels]
+            final_asks = all_asks[:depth_levels]
+
+            # 4. Calculate Cumulative Totals
+            response_bids = []
+            running_total = 0
+            for b in final_bids:
+                running_total += b['size']
+                response_bids.append({
+                    'price': b['price'],
+                    'size': b['size'],
+                    'total': round(running_total, 2)
                 })
-            
-            ask_list = []
-            running_ask_total = 0
-            for ask in asks:
-                running_ask_total += float(ask['total_size'])
-                ask_list.append({
-                    'price': float(ask['price']),
-                    'size': float(ask['total_size']),
-                    'total': round(running_ask_total * float(ask['price']), 2)
+
+            response_asks = []
+            running_total = 0
+            for a in final_asks:
+                running_total += a['size']
+                response_asks.append({
+                    'price': a['price'],
+                    'size': a['size'],
+                    'total': round(running_total, 2)
                 })
-            
+
             return Response({
-                'bids': bid_list,
-                'asks': ask_list,
-                'last_price': float(order_book.last_price) if order_book.last_price else 0,
-                'ticker': order_book.asset.ticker
+                'bids': response_bids,
+                'asks': response_asks,
+                'last_price': float(order_book.last_price) if order_book.last_price else (market_data.get('ask_price', 0) + market_data.get('bid_price', 0))/2,
+                'ticker': ticker,
+                'market_data': market_data
             })
             
         except Asset.DoesNotExist:

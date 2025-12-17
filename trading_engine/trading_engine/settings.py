@@ -224,10 +224,10 @@ REST_FRAMEWORK = {
         'rest_framework.throttling.UserRateThrottle'
     ],
     'DEFAULT_THROTTLE_RATES': {
-        'anon': '100/hour',
-        'user': '1000/hour',
-        'orders': '100/minute',
-        'trades': '50/minute',
+        'anon': '1000/hour',
+        'user': '10000/hour',
+        'orders': '1000/minute',
+        'trades': '1000/minute',
     }
 }
 
