@@ -301,3 +301,24 @@ class OrderBookRealtimeConsumer(AsyncWebsocketConsumer):
                 'ticker': self.ticker,
                 'error': str(e)
             } 
+
+class LiveStreamConsumer(AsyncWebsocketConsumer):
+    async def connect(self):
+        await self.channel_layer.group_add(
+            'live_stream',
+            self.channel_name
+        )
+        await self.accept()
+        
+    async def disconnect(self, close_code):
+        await self.channel_layer.group_discard(
+            'live_stream',
+            self.channel_name
+        )
+
+    async def stream_message(self, event):
+        """
+        Called when a message is sent to the 'live_stream' group.
+        """
+        message = event['message']
+        await self.send(text_data=json.dumps(message))
