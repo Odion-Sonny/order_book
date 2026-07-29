@@ -93,7 +93,7 @@ const AppLayout = () => {
                 </header>
 
                 {/* Page Content */}
-                <div className="p-8 flex-1">
+                <div className={cn("flex-1", location.pathname === '/trade' ? "p-0 overflow-hidden" : "p-8")}>
                     <Outlet />
                 </div>
             </main>
