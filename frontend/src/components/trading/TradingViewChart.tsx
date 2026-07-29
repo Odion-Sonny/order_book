@@ -1,6 +1,8 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
 import { SMA, RSI, MACD, BollingerBands } from 'technicalindicators';
+import { Eye, EyeOff, X } from 'lucide-react';
+import { cn } from '@/lib/utils';
 
 interface ChartData {
     time: string;
@@ -13,22 +15,42 @@ interface ChartData {
 
 interface TradingViewChartProps {
     data: ChartData[];
+    ticker?: string;
+    indicators?: {
+        rsi: boolean;
+        macd: boolean;
+        bollinger: boolean;
+        sma: boolean;
+    };
 }
 
-type Indicator = 'None' | 'SMA' | 'RSI' | 'MACD' | 'BB';
-
-export const TradingViewChart: React.FC<TradingViewChartProps> = ({ data }) => {
+export const TradingViewChart: React.FC<TradingViewChartProps> = ({ 
+    data, 
+    ticker = 'AAPL',
+    indicators = { rsi: true, macd: false, bollinger: false, sma: true }
+}) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const candlestickSeriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
     const volumeSeriesRef = useRef<ISeriesApi<"Histogram"> | null>(null);
     
     // Indicator Series Refs
-    const indicatorSeries1Ref = useRef<ISeriesApi<"Line"> | null>(null);
-    const indicatorSeries2Ref = useRef<ISeriesApi<"Line"> | null>(null);
-    const indicatorSeries3Ref = useRef<ISeriesApi<"Line"> | null>(null);
+    const smaSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const rsiSeriesRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const macdLineRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const macdSignalRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const bbUpperRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const bbMiddleRef = useRef<ISeriesApi<"Line"> | null>(null);
+    const bbLowerRef = useRef<ISeriesApi<"Line"> | null>(null);
 
-    const [activeIndicator, setActiveIndicator] = useState<Indicator>('SMA');
+    // Crosshair / Hovered Bar readout state
+    const [hoveredBar, setHoveredBar] = useState<ChartData | null>(null);
+
+    const latestBar = data.length > 0 ? data[data.length - 1] : null;
+    const activeBar = hoveredBar || latestBar;
+    
+    const barChange = activeBar ? activeBar.close - activeBar.open : 0;
+    const barChangePercent = activeBar && activeBar.open > 0 ? (barChange / activeBar.open) * 100 : 0;
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -44,20 +66,33 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ data }) => {
 
         const chart = createChart(chartContainerRef.current, {
             layout: {
-                background: { color: 'transparent' },
+                background: { color: '#131722' },
                 textColor: '#d1d4dc',
             },
             grid: {
-                vertLines: { color: 'rgba(42, 46, 57, 0.5)' },
-                horzLines: { color: 'rgba(42, 46, 57, 0.5)' },
+                vertLines: { color: '#1e222d' },
+                horzLines: { color: '#1e222d' },
             },
             crosshair: {
                 mode: 1, // Magnet mode
+                vertLine: {
+                    color: '#787b86',
+                    width: 1,
+                    style: 3, // Dashed
+                },
+                horzLine: {
+                    color: '#787b86',
+                    width: 1,
+                    style: 3,
+                }
             },
             timeScale: {
-                borderColor: 'rgba(197, 203, 206, 0.8)',
+                borderColor: '#2a2e39',
                 timeVisible: true,
                 secondsVisible: false,
+            },
+            rightPriceScale: {
+                borderColor: '#2a2e39',
             },
             width: chartContainerRef.current.clientWidth,
             height: chartContainerRef.current.clientHeight,
@@ -65,27 +100,45 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ data }) => {
 
         chartRef.current = chart;
 
-        // Create main Candlestick series
+        // Create main Candlestick series with TradingView standard greens/reds
         const candlestickSeries = chart.addCandlestickSeries({
-            upColor: '#26a69a',
-            downColor: '#ef5350',
+            upColor: '#089981',
+            downColor: '#f23645',
             borderVisible: false,
-            wickUpColor: '#26a69a',
-            wickDownColor: '#ef5350',
+            wickUpColor: '#089981',
+            wickDownColor: '#f23645',
         });
         candlestickSeriesRef.current = candlestickSeries;
 
         // Create Volume series overlay
         const volumeSeries = chart.addHistogramSeries({
-            color: '#26a69a',
+            color: '#089981',
             priceFormat: { type: 'volume' },
-            priceScaleId: '', // Set as an overlay
+            priceScaleId: '', 
             scaleMargins: {
-                top: 0.8, // volume takes bottom 20%
+                top: 0.82,
                 bottom: 0,
             },
         });
         volumeSeriesRef.current = volumeSeries;
+
+        // Crosshair hover listener for OHLC readout
+        chart.subscribeCrosshairMove((param) => {
+            if (!param.time || !param.seriesPrices) {
+                setHoveredBar(null);
+                return;
+            }
+            const candlePrice = param.seriesPrices.get(candlestickSeries) as any;
+            if (candlePrice) {
+                setHoveredBar({
+                    time: String(param.time),
+                    open: candlePrice.open,
+                    high: candlePrice.high,
+                    low: candlePrice.low,
+                    close: candlePrice.close,
+                });
+            }
+        });
 
         window.addEventListener('resize', handleResize);
 
@@ -106,7 +159,6 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ data }) => {
             close: d.close,
         }));
         
-        // Remove duplicates/sort if needed (lightweight-charts requires strictly ascending time)
         const uniqueData = Array.from(new Map(formattedData.map(item => [item.time, item])).values());
         uniqueData.sort((a, b) => a.time - b.time);
 
@@ -116,119 +168,130 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({ data }) => {
             const volumeData = data.map(d => ({
                 time: (new Date(d.time).getTime() / 1000) as any,
                 value: d.volume || 0,
-                color: d.close >= d.open ? 'rgba(38, 166, 154, 0.5)' : 'rgba(239, 83, 80, 0.5)',
+                color: d.close >= d.open ? 'rgba(8, 153, 129, 0.4)' : 'rgba(242, 54, 69, 0.4)',
             }));
             const uniqueVol = Array.from(new Map(volumeData.map(item => [item.time, item])).values());
             uniqueVol.sort((a, b) => a.time - b.time);
             volumeSeriesRef.current.setData(uniqueVol);
         }
 
-        // --- Calculate and Draw Indicators ---
+        // --- Indicators Calculation ---
         const closes = uniqueData.map(d => d.close);
         const times = uniqueData.map(d => d.time);
 
-        // Remove old indicator series if they exist
-        if (indicatorSeries1Ref.current) { chartRef.current.removeSeries(indicatorSeries1Ref.current); indicatorSeries1Ref.current = null; }
-        if (indicatorSeries2Ref.current) { chartRef.current.removeSeries(indicatorSeries2Ref.current); indicatorSeries2Ref.current = null; }
-        if (indicatorSeries3Ref.current) { chartRef.current.removeSeries(indicatorSeries3Ref.current); indicatorSeries3Ref.current = null; }
+        // Remove previous indicator series
+        if (smaSeriesRef.current) { chartRef.current.removeSeries(smaSeriesRef.current); smaSeriesRef.current = null; }
+        if (rsiSeriesRef.current) { chartRef.current.removeSeries(rsiSeriesRef.current); rsiSeriesRef.current = null; }
+        if (macdLineRef.current) { chartRef.current.removeSeries(macdLineRef.current); macdLineRef.current = null; }
+        if (macdSignalRef.current) { chartRef.current.removeSeries(macdSignalRef.current); macdSignalRef.current = null; }
+        if (bbUpperRef.current) { chartRef.current.removeSeries(bbUpperRef.current); bbUpperRef.current = null; }
+        if (bbMiddleRef.current) { chartRef.current.removeSeries(bbMiddleRef.current); bbMiddleRef.current = null; }
+        if (bbLowerRef.current) { chartRef.current.removeSeries(bbLowerRef.current); bbLowerRef.current = null; }
 
-        if (activeIndicator === 'SMA' && closes.length >= 20) {
+        // SMA
+        if (indicators.sma && closes.length >= 20) {
             const period = 20;
             const sma = SMA.calculate({ period, values: closes });
-            const smaData = sma.map((val, idx) => ({
-                time: times[idx + period - 1],
-                value: val
-            }));
-            
-            indicatorSeries1Ref.current = chartRef.current.addLineSeries({
-                color: '#2962FF',
-                lineWidth: 2,
-                title: 'SMA (20)'
-            });
-            indicatorSeries1Ref.current.setData(smaData);
+            const smaData = sma.map((val, idx) => ({ time: times[idx + period - 1], value: val }));
+            smaSeriesRef.current = chartRef.current.addLineSeries({ color: '#2962FF', lineWidth: 2, title: 'SMA 20' });
+            smaSeriesRef.current.setData(smaData);
         }
-        else if (activeIndicator === 'RSI' && closes.length >= 14) {
+
+        // RSI
+        if (indicators.rsi && closes.length >= 14) {
             const period = 14;
             const rsi = RSI.calculate({ period, values: closes });
-            const rsiData = rsi.map((val, idx) => ({
-                time: times[idx + period],
-                value: val
-            }));
-
-            // Create a separate pane for RSI
-            indicatorSeries1Ref.current = chartRef.current.addLineSeries({
-                color: '#9C27B0',
-                lineWidth: 2,
-                title: 'RSI (14)',
-                priceScaleId: 'rsi',
-            });
-            chartRef.current.priceScale('rsi').applyOptions({
-                scaleMargins: { top: 0.8, bottom: 0 },
-            });
-            indicatorSeries1Ref.current.setData(rsiData);
+            const rsiData = rsi.map((val, idx) => ({ time: times[idx + period], value: val }));
+            rsiSeriesRef.current = chartRef.current.addLineSeries({ color: '#e040fb', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi' });
+            chartRef.current.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
+            rsiSeriesRef.current.setData(rsiData);
         }
-        else if (activeIndicator === 'MACD' && closes.length >= 26) {
-            const macdInput = {
-                values: closes,
-                fastPeriod: 12,
-                slowPeriod: 26,
-                signalPeriod: 9,
-                SimpleMAOscillator: false,
-                SimpleMASignal: false
-            };
-            const macdResult = MACD.calculate(macdInput);
-            
+
+        // MACD
+        if (indicators.macd && closes.length >= 26) {
+            const macdResult = MACD.calculate({ values: closes, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false });
             const macdLine = macdResult.map((val, idx) => ({ time: times[idx + 25], value: val.MACD || 0 }));
             const signalLine = macdResult.map((val, idx) => ({ time: times[idx + 25], value: val.signal || 0 }));
-            // Note: Histogram could be added as well
 
-            indicatorSeries1Ref.current = chartRef.current.addLineSeries({ color: '#2962FF', lineWidth: 2, title: 'MACD', priceScaleId: 'macd' });
-            indicatorSeries2Ref.current = chartRef.current.addLineSeries({ color: '#FF6D00', lineWidth: 2, title: 'Signal', priceScaleId: 'macd' });
-            
+            macdLineRef.current = chartRef.current.addLineSeries({ color: '#2962FF', lineWidth: 2, priceScaleId: 'macd' });
+            macdSignalRef.current = chartRef.current.addLineSeries({ color: '#ff6d00', lineWidth: 2, priceScaleId: 'macd' });
             chartRef.current.priceScale('macd').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-            
-            indicatorSeries1Ref.current.setData(macdLine);
-            indicatorSeries2Ref.current.setData(signalLine);
+            macdLineRef.current.setData(macdLine);
+            macdSignalRef.current.setData(signalLine);
         }
-        else if (activeIndicator === 'BB' && closes.length >= 20) {
-            const bbInput = { period: 20, values: closes, stdDev: 2 };
-            const bbResult = BollingerBands.calculate(bbInput);
 
+        // Bollinger Bands
+        if (indicators.bollinger && closes.length >= 20) {
+            const bbResult = BollingerBands.calculate({ period: 20, values: closes, stdDev: 2 });
             const upper = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.upper }));
             const middle = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.middle }));
             const lower = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.lower }));
 
-            indicatorSeries1Ref.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.5)', lineWidth: 1 });
-            indicatorSeries2Ref.current = chartRef.current.addLineSeries({ color: 'rgba(255, 109, 0, 0.8)', lineWidth: 1, title: 'BB (20, 2)' });
-            indicatorSeries3Ref.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.5)', lineWidth: 1 });
+            bbUpperRef.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
+            bbMiddleRef.current = chartRef.current.addLineSeries({ color: 'rgba(255, 109, 0, 0.8)', lineWidth: 1 });
+            bbLowerRef.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
 
-            indicatorSeries1Ref.current.setData(upper);
-            indicatorSeries2Ref.current.setData(middle);
-            indicatorSeries3Ref.current.setData(lower);
+            bbUpperRef.current.setData(upper);
+            bbMiddleRef.current.setData(middle);
+            bbLowerRef.current.setData(lower);
         }
 
-    }, [data, activeIndicator]);
+    }, [data, indicators]);
 
     return (
-        <div className="w-full h-full flex flex-col relative group">
-            {/* Indicator Toolbar */}
-            <div className="absolute top-4 left-4 z-10 flex gap-2 opacity-30 group-hover:opacity-100 transition-opacity">
-                {(['None', 'SMA', 'RSI', 'MACD', 'BB'] as Indicator[]).map((ind) => (
-                    <button
-                        key={ind}
-                        onClick={() => setActiveIndicator(ind)}
-                        className={`px-3 py-1 text-xs font-semibold rounded-md backdrop-blur-md transition-all ${
-                            activeIndicator === ind 
-                                ? 'bg-blue-500/80 text-white border border-blue-400' 
-                                : 'bg-black/50 text-gray-400 border border-white/10 hover:bg-black/80 hover:text-white'
-                        }`}
-                    >
-                        {ind}
-                    </button>
-                ))}
+        <div className="w-full h-full flex flex-col relative select-none bg-[#131722]">
+            {/* TradingView Top-Left Legend Overlay */}
+            <div className="absolute top-3 left-4 z-10 font-mono text-xs flex flex-col space-y-1 pointer-events-none">
+                {/* Symbol & Bar Readout */}
+                <div className="flex items-center gap-2 flex-wrap">
+                    <span className="font-extrabold text-white font-sans text-sm">{ticker}</span>
+                    <span className="text-[10px] text-[#787b86] font-sans">1D · NASDAQ</span>
+                    
+                    {activeBar && (
+                        <div className="flex items-center gap-2 text-[11px]">
+                            <span className="text-[#787b86]">O<strong className="text-white ml-0.5">${activeBar.open.toFixed(2)}</strong></span>
+                            <span className="text-[#787b86]">H<strong className="text-white ml-0.5">${activeBar.high.toFixed(2)}</strong></span>
+                            <span className="text-[#787b86]">L<strong className="text-white ml-0.5">${activeBar.low.toFixed(2)}</strong></span>
+                            <span className="text-[#787b86]">C<strong className="text-white ml-0.5">${activeBar.close.toFixed(2)}</strong></span>
+                            
+                            <span className={cn("font-bold ml-1", barChange >= 0 ? "text-[#089981]" : "text-[#f23645]")}>
+                                {barChange >= 0 ? '+' : ''}{barChange.toFixed(2)} ({barChangePercent.toFixed(2)}%)
+                            </span>
+                        </div>
+                    )}
+                </div>
+
+                {/* Active Indicators Legend Labels */}
+                <div className="flex items-center gap-3 text-[10px] font-sans text-[#787b86]">
+                    {indicators.sma && (
+                        <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-[#2962FF]" />
+                            <strong className="text-[#2962FF]">SMA 20</strong> close
+                        </span>
+                    )}
+                    {indicators.rsi && (
+                        <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-[#e040fb]" />
+                            <strong className="text-[#e040fb]">RSI 14</strong> close
+                        </span>
+                    )}
+                    {indicators.macd && (
+                        <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-[#ff6d00]" />
+                            <strong className="text-[#ff6d00]">MACD 12 26 9</strong>
+                        </span>
+                    )}
+                    {indicators.bollinger && (
+                        <span className="flex items-center gap-1">
+                            <span className="w-2 h-2 rounded-full bg-[#2962FF]" />
+                            <strong className="text-white">BB 20 2</strong>
+                        </span>
+                    )}
+                </div>
             </div>
-            {/* Chart Container */}
-            <div ref={chartContainerRef} className="flex-1 w-full" />
+
+            {/* Main Canvas */}
+            <div ref={chartContainerRef} className="flex-1 w-full h-full" />
         </div>
     );
 };
