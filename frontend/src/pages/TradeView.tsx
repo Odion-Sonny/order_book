@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { apiService } from '@/services/api';
 import type { Asset, Portfolio, Trade } from '@/types';
 import { cn } from '@/lib/utils';
-import { CandleStickChart } from '@/components/trading/CandleStickChart';
+import { TradingViewChart } from '@/components/trading/TradingViewChart';
 import { MarketDepthChart } from '@/components/trading/MarketDepthChart';
 import { OrderBookTable } from '@/components/trading/OrderBookTable';
 import { RecentTrades } from '@/components/trading/RecentTrades';
@@ -239,7 +239,7 @@ const TradeView = () => {
                     <div className="bg-card border border-border rounded-xl flex-1 relative flex flex-col shadow-sm overflow-hidden bg-black/40">
                         <div className="flex-1 w-full relative p-2">
                             {chartMode === 'PRICE' ? (
-                                <CandleStickChart data={chartData} />
+                                <TradingViewChart data={chartData} ticker={selectedTicker} />
                             ) : (
                                 <MarketDepthChart bids={bids} asks={asks} />
                             )}
