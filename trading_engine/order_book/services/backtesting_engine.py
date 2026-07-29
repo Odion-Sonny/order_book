@@ -123,12 +123,90 @@ class BacktestEngine:
         return pd.DataFrame(data)
 
     def _execute_strategy(self, data):
-        """Execute the trading strategy defined in strategy_code"""
-        # For safety, we'll implement a simple strategy here
-        # In production, you might want to use exec() with strict sandboxing
+        """Execute the trading strategy defined in strategy_code using RestrictedPython"""
+        code = self.backtest_run.strategy_code
+        if not code:
+            self._simple_ma_strategy(data)
+            return
 
-        # Simple Moving Average Crossover Strategy
-        self._simple_ma_strategy(data)
+        from RestrictedPython import compile_restricted
+        from RestrictedPython.Guards import safe_builtins
+
+        safe_globals = {
+            '__builtins__': safe_builtins,
+            'pd': pd,
+            'len': len,
+            'int': int,
+            'float': float,
+        }
+
+        try:
+            byte_code = compile_restricted(code, '<inline>', 'exec')
+            exec(byte_code, safe_globals)
+            
+            if 'on_data' in safe_globals:
+                self._run_on_data_loop(data, safe_globals['on_data'])
+            else:
+                raise Exception("Strategy must define 'on_data(data, cash, positions, buy, sell)'")
+        except Exception as e:
+            print(f"Strategy execution error: {e}")
+            raise
+
+    def _run_on_data_loop(self, data, on_data_func):
+        dates = sorted(data['timestamp'].unique())
+        for date in dates:
+            current_data = data[data['timestamp'] <= date].copy()
+            
+            def buy(symbol, qty):
+                symbol_data = current_data[current_data['symbol'] == symbol]
+                if symbol_data.empty: return
+                current_price = symbol_data.iloc[-1]['close']
+                cost = qty * current_price
+                if cost <= self.cash:
+                    self.cash -= cost
+                    self.positions[symbol] = self.positions.get(symbol, 0) + qty
+                    self.trades.append({
+                        'timestamp': date,
+                        'symbol': symbol,
+                        'side': 'BUY',
+                        'price': current_price,
+                        'quantity': qty,
+                        'value': cost
+                    })
+
+            def sell(symbol, qty):
+                position = self.positions.get(symbol, 0)
+                if position >= qty:
+                    symbol_data = current_data[current_data['symbol'] == symbol]
+                    if symbol_data.empty: return
+                    current_price = symbol_data.iloc[-1]['close']
+                    revenue = qty * current_price
+                    self.cash += revenue
+                    self.positions[symbol] -= qty
+                    if self.positions[symbol] == 0:
+                        del self.positions[symbol]
+                    self.trades.append({
+                        'timestamp': date,
+                        'symbol': symbol,
+                        'side': 'SELL',
+                        'price': current_price,
+                        'quantity': qty,
+                        'value': revenue
+                    })
+
+            on_data_func(current_data, self.cash, self.positions.copy(), buy, sell)
+            
+            # Calculate daily equity
+            positions_value = sum(
+                self.positions.get(s, 0) * current_data[current_data['symbol'] == s].iloc[-1]['close']
+                for s in self.positions if not current_data[current_data['symbol'] == s].empty
+            )
+            total_equity = self.cash + positions_value
+
+            self.equity_curve.append({
+                'date': date.isoformat() if hasattr(date, 'isoformat') else str(date),
+                'equity': total_equity
+            })
 
     def _simple_ma_strategy(self, data):
         """
