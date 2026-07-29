@@ -158,6 +158,55 @@ const TradeView = () => {
 
     }, [trades, selectedAsset]);
 
+    // Live Stream WebSocket connection
+    useEffect(() => {
+        if (!selectedTicker) return;
+
+        const wsUrl = `ws://localhost:8000/ws/stream/`;
+        const ws = new WebSocket(wsUrl);
+
+        ws.onopen = () => {
+            console.log('Connected to live market stream');
+        };
+
+        ws.onmessage = (event) => {
+            try {
+                const data = JSON.parse(event.data);
+                if (data.type === 'bar' && data.data.symbol === selectedTicker) {
+                    const bar = data.data;
+                    setChartData(prev => {
+                        const newBar = {
+                            time: bar.timestamp.split('T')[0], // Simplified to day format for now, or full ISO if chart supports it
+                            open: parseFloat(bar.open),
+                            high: parseFloat(bar.high),
+                            low: parseFloat(bar.low),
+                            close: parseFloat(bar.close),
+                            volume: parseFloat(bar.volume || 0)
+                        };
+                        // Since lightweight-charts expects strictly ascending time, we update the last bar if same day, or append new one
+                        const last = prev[prev.length - 1];
+                        if (last && last.time === newBar.time) {
+                            return [...prev.slice(0, -1), newBar];
+                        }
+                        return [...prev, newBar];
+                    });
+                }
+            } catch (e) {
+                console.error('Error parsing WS message', e);
+            }
+        };
+
+        ws.onerror = (e) => {
+            console.error('WebSocket error:', e);
+        };
+
+        return () => {
+            if (ws.readyState === 1) {
+                ws.close();
+            }
+        };
+    }, [selectedTicker]);
+
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
