@@ -283,6 +283,32 @@ class BacktestRun(models.Model):
         ordering = ['-created_at']
 
 
+class LiveBot(models.Model):
+    """
+    Represents an active or stopped live trading bot.
+    """
+    user = models.ForeignKey(User, on_delete=models.CASCADE)
+    name = models.CharField(max_length=200)
+    strategy_code = models.TextField(help_text="Python code for the trading strategy")
+    status = models.CharField(max_length=20, choices=[
+        ('RUNNING', 'Running'),
+        ('STOPPED', 'Stopped'),
+        ('FAILED', 'Failed'),
+    ], default='STOPPED')
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+    error_message = models.TextField(blank=True)
+
+    def __str__(self):
+        return f"LiveBot: {self.name} ({self.status})"
+
+    class Meta:
+        indexes = [
+            models.Index(fields=['user', 'status']),
+        ]
+        ordering = ['-created_at']
+
+
 class BacktestResult(models.Model):
     """
     Stores results and metrics from a backtest run.
