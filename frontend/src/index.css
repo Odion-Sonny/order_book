@@ -86,14 +86,38 @@
     -moz-osx-font-smoothing: grayscale;
   }
 
-  /* Remove scrollbars for cleaner look */
-  ::-webkit-scrollbar {
-    display: none;
+  /* Custom subtle scrollbar for TradingView tables */
+  .tv-scrollbar::-webkit-scrollbar {
+    width: 5px;
+    height: 5px;
+    display: block;
+  }
+  .tv-scrollbar::-webkit-scrollbar-track {
+    background: #131722;
+  }
+  .tv-scrollbar::-webkit-scrollbar-thumb {
+    background: #2a2e39;
+    border-radius: 2px;
+  }
+  .tv-scrollbar::-webkit-scrollbar-thumb:hover {
+    background: #363c4e;
   }
 }
 
 @layer utilities {
   .text-balance {
     text-wrap: balance;
+  }
+  .bg-tv-base {
+    background-color: #131722;
+  }
+  .bg-tv-panel {
+    background-color: #1e222d;
+  }
+  .bg-tv-card {
+    background-color: #181c27;
+  }
+  .border-tv-border {
+    border-color: #2a2e39;
   }
 }
