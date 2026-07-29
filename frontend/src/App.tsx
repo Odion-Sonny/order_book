@@ -3,6 +3,7 @@ import AppLayout from '@/components/layout/AppLayout';
 import Dashboard from '@/pages/Dashboard';
 import Markets from '@/pages/Markets';
 import TradeView from '@/pages/TradeView';
+import QuantLab from '@/pages/QuantLab';
 
 import Login from '@/pages/Login';
 import ProtectedRoute from '@/components/ProtectedRoute';
@@ -23,6 +24,7 @@ function App() {
             <Route path="/portfolio" element={<Portfolio />} />
             <Route path="/history" element={<History />} />
             <Route path="/markets" element={<Markets />} />
+            <Route path="/quantlab" element={<QuantLab />} />
             {/* Catch all redirect to dashboard */}
             <Route path="*" element={<Navigate to="/" replace />} />
           </Route>

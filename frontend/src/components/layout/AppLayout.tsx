@@ -6,7 +6,8 @@ import {
     Settings,
     Bell,
     Search,
-    Wallet
+    Wallet,
+    Terminal
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
@@ -50,6 +51,7 @@ const AppLayout = () => {
                     <div className="text-[11px] font-bold text-neutral-500 uppercase tracking-widest mb-4 px-4 pt-2">Menu</div>
                     <SidebarItem to="/" icon={LayoutDashboard} label="Dashboard" />
                     <SidebarItem to="/trade" icon={LineChart} label="Trade" />
+                    <SidebarItem to="/quantlab" icon={Terminal} label="Quant Lab" />
                     <SidebarItem to="/portfolio" icon={Wallet} label="Portfolio" />
                     <SidebarItem to="/history" icon={History} label="History" />
                 </div>
