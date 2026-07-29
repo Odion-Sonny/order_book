@@ -17,6 +17,7 @@ export interface Portfolio {
     cash_balance: string;
     total_value: string;
     buying_power: string;
+    positions?: Position[];
     created_at: string;
     updated_at: string;
 }
