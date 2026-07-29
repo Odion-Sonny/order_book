@@ -116,7 +116,7 @@ const TradeView = () => {
         trades.forEach(t => {
             const dateStr = t.timestamp.split('T')[0];
             const price = parseFloat(t.price);
-            const size = parseFloat(t.size);
+            const size = parseFloat(t.quantity || '0');
 
             if (!candleMap.has(dateStr)) {
                 candleMap.set(dateStr, { time: dateStr, open: price, high: price, low: price, close: price, volume: size });

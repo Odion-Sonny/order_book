@@ -36,8 +36,8 @@ export const RecentTrades: React.FC<RecentTradesProps> = ({ trades }) => {
                             )}
                         >
                             <span>{parseFloat(trade.price).toFixed(2)}</span>
-                            <span className="text-right text-slate-300">
-                                {parseFloat(trade.quantity?.toString() || trade.size?.toString() || '0').toLocaleString()}
+                            <span className="text-right text-[#d1d4dc]">
+                                {parseFloat(trade.quantity || '0').toLocaleString()}
                             </span>
                             <span className="text-right text-slate-500">
                                 {format(new Date(trade.timestamp), 'HH:mm:ss')}

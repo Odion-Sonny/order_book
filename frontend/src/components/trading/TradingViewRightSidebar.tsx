@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { Asset, Portfolio, Trade } from '@/types';
+import type { Asset, Portfolio, Trade } from '@/types';
 import { cn } from '@/lib/utils';
 import { OrderBookTable } from './OrderBookTable';
 import { MarketDepthChart } from './MarketDepthChart';
@@ -7,13 +7,9 @@ import { RecentTrades } from './RecentTrades';
 import { 
     List, 
     Layers, 
-    ArrowUpRight, 
-    ArrowDownRight, 
     CreditCard, 
     History as HistoryIcon,
     Search,
-    TrendingUp,
-    BarChart2,
     DollarSign,
     CheckCircle2,
     AlertCircle

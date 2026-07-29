@@ -1,7 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
-import { createChart, IChartApi, ISeriesApi } from 'lightweight-charts';
+import { 
+    createChart, 
+    CandlestickSeries, 
+    HistogramSeries, 
+    LineSeries, 
+    type IChartApi, 
+    type ISeriesApi 
+} from 'lightweight-charts';
 import { SMA, RSI, MACD, BollingerBands } from 'technicalindicators';
-import { Eye, EyeOff, X } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
 interface ChartData {
@@ -101,7 +107,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         chartRef.current = chart;
 
         // Create main Candlestick series with TradingView standard greens/reds
-        const candlestickSeries = chart.addCandlestickSeries({
+        const candlestickSeries = chart.addSeries(CandlestickSeries, {
             upColor: '#089981',
             downColor: '#f23645',
             borderVisible: false,
@@ -111,10 +117,12 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         candlestickSeriesRef.current = candlestickSeries;
 
         // Create Volume series overlay
-        const volumeSeries = chart.addHistogramSeries({
+        const volumeSeries = chart.addSeries(HistogramSeries, {
             color: '#089981',
             priceFormat: { type: 'volume' },
-            priceScaleId: '', 
+            priceScaleId: 'volume', 
+        });
+        chart.priceScale('volume').applyOptions({
             scaleMargins: {
                 top: 0.82,
                 bottom: 0,
@@ -124,11 +132,11 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         // Crosshair hover listener for OHLC readout
         chart.subscribeCrosshairMove((param) => {
-            if (!param.time || !param.seriesPrices) {
+            if (!param.time || !param.seriesData) {
                 setHoveredBar(null);
                 return;
             }
-            const candlePrice = param.seriesPrices.get(candlestickSeries) as any;
+            const candlePrice = param.seriesData.get(candlestickSeries) as any;
             if (candlePrice) {
                 setHoveredBar({
                     time: String(param.time),
@@ -180,60 +188,67 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         const times = uniqueData.map(d => d.time);
 
         // Remove previous indicator series
-        if (smaSeriesRef.current) { chartRef.current.removeSeries(smaSeriesRef.current); smaSeriesRef.current = null; }
-        if (rsiSeriesRef.current) { chartRef.current.removeSeries(rsiSeriesRef.current); rsiSeriesRef.current = null; }
-        if (macdLineRef.current) { chartRef.current.removeSeries(macdLineRef.current); macdLineRef.current = null; }
-        if (macdSignalRef.current) { chartRef.current.removeSeries(macdSignalRef.current); macdSignalRef.current = null; }
-        if (bbUpperRef.current) { chartRef.current.removeSeries(bbUpperRef.current); bbUpperRef.current = null; }
-        if (bbMiddleRef.current) { chartRef.current.removeSeries(bbMiddleRef.current); bbMiddleRef.current = null; }
-        if (bbLowerRef.current) { chartRef.current.removeSeries(bbLowerRef.current); bbLowerRef.current = null; }
+        if (smaSeriesRef.current && chartRef.current) { chartRef.current.removeSeries(smaSeriesRef.current); smaSeriesRef.current = null; }
+        if (rsiSeriesRef.current && chartRef.current) { chartRef.current.removeSeries(rsiSeriesRef.current); rsiSeriesRef.current = null; }
+        if (macdLineRef.current && chartRef.current) { chartRef.current.removeSeries(macdLineRef.current); macdLineRef.current = null; }
+        if (macdSignalRef.current && chartRef.current) { chartRef.current.removeSeries(macdSignalRef.current); macdSignalRef.current = null; }
+        if (bbUpperRef.current && chartRef.current) { chartRef.current.removeSeries(bbUpperRef.current); bbUpperRef.current = null; }
+        if (bbMiddleRef.current && chartRef.current) { chartRef.current.removeSeries(bbMiddleRef.current); bbMiddleRef.current = null; }
+        if (bbLowerRef.current && chartRef.current) { chartRef.current.removeSeries(bbLowerRef.current); bbLowerRef.current = null; }
 
         // SMA
-        if (indicators.sma && closes.length >= 20) {
+        if (indicators.sma && closes.length >= 20 && chartRef.current) {
             const period = 20;
             const sma = SMA.calculate({ period, values: closes });
             const smaData = sma.map((val, idx) => ({ time: times[idx + period - 1], value: val }));
-            smaSeriesRef.current = chartRef.current.addLineSeries({ color: '#2962FF', lineWidth: 2, title: 'SMA 20' });
-            smaSeriesRef.current.setData(smaData);
+            const smaSeries = chartRef.current.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2, title: 'SMA 20' });
+            smaSeries.setData(smaData);
+            smaSeriesRef.current = smaSeries;
         }
 
         // RSI
-        if (indicators.rsi && closes.length >= 14) {
+        if (indicators.rsi && closes.length >= 14 && chartRef.current) {
             const period = 14;
             const rsi = RSI.calculate({ period, values: closes });
             const rsiData = rsi.map((val, idx) => ({ time: times[idx + period], value: val }));
-            rsiSeriesRef.current = chartRef.current.addLineSeries({ color: '#e040fb', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi' });
+            const rsiSeries = chartRef.current.addSeries(LineSeries, { color: '#e040fb', lineWidth: 2, title: 'RSI 14', priceScaleId: 'rsi' });
             chartRef.current.priceScale('rsi').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-            rsiSeriesRef.current.setData(rsiData);
+            rsiSeries.setData(rsiData);
+            rsiSeriesRef.current = rsiSeries;
         }
 
         // MACD
-        if (indicators.macd && closes.length >= 26) {
+        if (indicators.macd && closes.length >= 26 && chartRef.current) {
             const macdResult = MACD.calculate({ values: closes, fastPeriod: 12, slowPeriod: 26, signalPeriod: 9, SimpleMAOscillator: false, SimpleMASignal: false });
             const macdLine = macdResult.map((val, idx) => ({ time: times[idx + 25], value: val.MACD || 0 }));
             const signalLine = macdResult.map((val, idx) => ({ time: times[idx + 25], value: val.signal || 0 }));
 
-            macdLineRef.current = chartRef.current.addLineSeries({ color: '#2962FF', lineWidth: 2, priceScaleId: 'macd' });
-            macdSignalRef.current = chartRef.current.addLineSeries({ color: '#ff6d00', lineWidth: 2, priceScaleId: 'macd' });
+            const mLine = chartRef.current.addSeries(LineSeries, { color: '#2962FF', lineWidth: 2, priceScaleId: 'macd' });
+            const sLine = chartRef.current.addSeries(LineSeries, { color: '#ff6d00', lineWidth: 2, priceScaleId: 'macd' });
             chartRef.current.priceScale('macd').applyOptions({ scaleMargins: { top: 0.8, bottom: 0 } });
-            macdLineRef.current.setData(macdLine);
-            macdSignalRef.current.setData(signalLine);
+            mLine.setData(macdLine);
+            sLine.setData(signalLine);
+            macdLineRef.current = mLine;
+            macdSignalRef.current = sLine;
         }
 
         // Bollinger Bands
-        if (indicators.bollinger && closes.length >= 20) {
+        if (indicators.bollinger && closes.length >= 20 && chartRef.current) {
             const bbResult = BollingerBands.calculate({ period: 20, values: closes, stdDev: 2 });
             const upper = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.upper }));
             const middle = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.middle }));
             const lower = bbResult.map((val, idx) => ({ time: times[idx + 19], value: val.lower }));
 
-            bbUpperRef.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
-            bbMiddleRef.current = chartRef.current.addLineSeries({ color: 'rgba(255, 109, 0, 0.8)', lineWidth: 1 });
-            bbLowerRef.current = chartRef.current.addLineSeries({ color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
+            const bUpper = chartRef.current.addSeries(LineSeries, { color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
+            const bMiddle = chartRef.current.addSeries(LineSeries, { color: 'rgba(255, 109, 0, 0.8)', lineWidth: 1 });
+            const bLower = chartRef.current.addSeries(LineSeries, { color: 'rgba(41, 98, 255, 0.6)', lineWidth: 1 });
 
-            bbUpperRef.current.setData(upper);
-            bbMiddleRef.current.setData(middle);
-            bbLowerRef.current.setData(lower);
+            bUpper.setData(upper);
+            bMiddle.setData(middle);
+            bLower.setData(lower);
+            bbUpperRef.current = bUpper;
+            bbMiddleRef.current = bMiddle;
+            bbLowerRef.current = bLower;
         }
 
     }, [data, indicators]);

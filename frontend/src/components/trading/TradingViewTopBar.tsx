@@ -1,16 +1,14 @@
 import React, { useState } from 'react';
-import { Asset } from '@/types';
+import type { Asset } from '@/types';
 import { cn } from '@/lib/utils';
 import { 
     Search, 
     CandlestickChart, 
     LineChart, 
     AreaChart, 
-    SlidersHorizontal, 
     Maximize2, 
     ChevronDown,
-    Activity,
-    RotateCcw
+    Activity
 } from 'lucide-react';
 
 interface TradingViewTopBarProps {
@@ -52,12 +50,6 @@ export const TradingViewTopBar: React.FC<TradingViewTopBarProps> = ({
     const [isSearchOpen, setIsSearchOpen] = useState(false);
     const [isIndicatorsOpen, setIsIndicatorsOpen] = useState(false);
     const [searchQuery, setSearchQuery] = useState('');
-
-    const selectedAsset = assets.find(a => a.ticker === selectedTicker) || {
-        ticker: selectedTicker,
-        name: selectedTicker,
-        description: 'Stock Asset'
-    };
 
     const filteredAssets = assets.filter(a => 
         a.ticker.toLowerCase().includes(searchQuery.toLowerCase()) || 

@@ -2,7 +2,6 @@ import { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { Play, Rocket, TerminalSquare, AlertCircle } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { apiService } from '@/services/api';
 
 const DEFAULT_STRATEGY = `
 # Quantitative Trading Strategy

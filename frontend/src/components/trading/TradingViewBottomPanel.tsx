@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import Editor from '@monaco-editor/react';
 import { cn } from '@/lib/utils';
-import { Portfolio } from '@/types';
+import type { Portfolio } from '@/types';
 import { 
     Code2, 
     BarChart3, 
@@ -10,8 +10,7 @@ import {
     ChevronUp, 
     ChevronDown, 
     Play, 
-    Rocket,
-    AlertCircle
+    Rocket
 } from 'lucide-react';
 
 interface TradingViewBottomPanelProps {
