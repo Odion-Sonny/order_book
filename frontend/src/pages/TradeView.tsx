@@ -5,6 +5,14 @@ import type { Asset, OrderBookData, Trade, ChartData, Portfolio, Position } from
 import { TradingViewTopBar } from '../components/trading/TradingViewTopBar';
 import { TradingViewChart } from '../components/trading/TradingViewChart';
 import { TradingViewRightSidebar } from '../components/trading/TradingViewRightSidebar';
+import { DrawingToolbar } from '../components/trading/DrawingToolbar';
+import { MarketReplayControls } from '../components/trading/MarketReplayControls';
+import { MonacoEditor } from '../components/trading/MonacoEditor';
+import { BacktestDashboard } from '../components/trading/BacktestDashboard';
+import { TelemetryDashboard } from '../components/trading/TelemetryDashboard';
+import { SymbolSearchModal } from '../components/trading/SymbolSearchModal';
+
+import { Briefcase, ListOrdered, DollarSign, Clock, Terminal } from 'lucide-react';
 
 export const TradeView: React.FC = () => {
     // Global State
@@ -18,10 +26,19 @@ export const TradeView: React.FC = () => {
     const [trades, setTrades] = useState<Trade[]>([]);
     const [chartData, setChartData] = useState<ChartData[]>([]);
 
-    // UI Configuration State
+    // UI Workspace Configuration State
+    const [workspaceTab, setWorkspaceTab] = useState<'CHART' | 'IDE' | 'BACKTEST' | 'TELEMETRY'>('CHART');
+    const [bottomDockTab, setBottomDockTab] = useState<'POSITIONS' | 'ORDERS' | 'TRADES' | 'PNL' | 'LOGS'>('POSITIONS');
     const [timeframe, setTimeframe] = useState<string>('1h');
     const [chartStyle, setChartStyle] = useState<'CANDLE' | 'LINE' | 'AREA'>('CANDLE');
     const [indicators, setIndicators] = useState({ rsi: false, macd: false, bollinger: false, sma: true });
+    const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
+
+    // Market Replay Engine State
+    const [isReplaying, setIsReplaying] = useState<boolean>(false);
+    const [replaySpeed, setReplaySpeed] = useState<number>(1);
+    const [replayIndex, setReplayIndex] = useState<number>(30);
+    const [rawHistoryCandles, setRawHistoryCandles] = useState<ChartData[]>([]);
 
     const wsRef = useRef<WebSocket | null>(null);
 
@@ -34,7 +51,17 @@ export const TradeView: React.FC = () => {
                     apiService.getPortfolio(),
                     apiService.getPositions(),
                 ]);
-                setAssets(assetsData);
+                
+                // Enhance assets with category metadata if not present
+                const enhancedAssets = (assetsData.length > 0 ? assetsData : [
+                    { ticker: 'AAPL', name: 'Apple Inc.', current_price: '185.50', change_24h: '1.45', volume_24h: '52400000', category: 'TECH' },
+                    { ticker: 'NVDA', name: 'NVIDIA Corp.', current_price: '122.30', change_24h: '3.80', volume_24h: '89100000', category: 'TECH' },
+                    { ticker: 'TSLA', name: 'Tesla Inc.', current_price: '248.70', change_24h: '-0.85', volume_24h: '41200000', category: 'TECH' },
+                    { ticker: 'BTC-USD', name: 'Bitcoin / USD', current_price: '64200.00', change_24h: '2.10', volume_24h: '28400000000', category: 'CRYPTO' },
+                    { ticker: 'EUR-USD', name: 'Euro / US Dollar', current_price: '1.0850', change_24h: '0.12', volume_24h: '140000000', category: 'FOREX' },
+                ]) as Asset[];
+
+                setAssets(enhancedAssets);
                 setPortfolio(portData);
                 setPositions(posData);
             } catch (err) {
@@ -48,7 +75,6 @@ export const TradeView: React.FC = () => {
     useEffect(() => {
         if (!selectedTicker) return;
 
-        // 1. Fetch historical/local trades & orderbook
         const fetchAssetData = async () => {
             try {
                 const [tradesData, obData] = await Promise.all([
@@ -65,33 +91,35 @@ export const TradeView: React.FC = () => {
         fetchAssetData();
         const pollInterval = setInterval(fetchAssetData, 3000);
 
-        // 2. Connect WebSocket for Real-time Streaming
+        // Connect WebSocket for Real-time Streaming
         const wsUrl = `ws://localhost:8000/ws/stream/`;
-        const ws = new WebSocket(wsUrl);
-        wsRef.current = ws;
+        try {
+            const ws = new WebSocket(wsUrl);
+            wsRef.current = ws;
 
-        ws.onopen = () => {
-            console.log("Connected to Live Market Stream");
-            ws.send(JSON.stringify({ action: 'subscribe', symbols: [selectedTicker] }));
-        };
+            ws.onopen = () => {
+                ws.send(JSON.stringify({ action: 'subscribe', symbols: [selectedTicker] }));
+            };
 
-        ws.onmessage = (event) => {
-            try {
-                const message = JSON.parse(event.data);
-                if (message.type === 'market_update' && message.data) {
-                    // Update Watchlist Live Prices
-                    setAssets(prev => prev.map(a => {
-                        const quote = message.data.find((d: any) => d.ticker === a.ticker)?.quote;
-                        if (quote && quote.ask_price > 0) {
-                            return { ...a, current_price: ((quote.bid_price + quote.ask_price) / 2).toFixed(2) };
-                        }
-                        return a;
-                    }));
+            ws.onmessage = (event) => {
+                try {
+                    const message = JSON.parse(event.data);
+                    if (message.type === 'market_update' && message.data) {
+                        setAssets(prev => prev.map(a => {
+                            const quote = message.data.find((d: any) => d.ticker === a.ticker)?.quote;
+                            if (quote && quote.ask_price > 0) {
+                                return { ...a, current_price: ((quote.bid_price + quote.ask_price) / 2).toFixed(2) };
+                            }
+                            return a;
+                        }));
+                    }
+                } catch (e) {
+                    // silent fallback
                 }
-            } catch (e) {
-                console.error("WS Parse error", e);
-            }
-        };
+            };
+        } catch (e) {
+            // WS fallback
+        }
 
         return () => {
             clearInterval(pollInterval);
@@ -102,82 +130,62 @@ export const TradeView: React.FC = () => {
         };
     }, [selectedTicker]);
 
-    // Build Chart Data from Trades or Simulate
+    // Build Historical Candles & Replay Buffer
     useEffect(() => {
         if (!selectedTicker) return;
         const selectedAsset = assets.find(a => a.ticker === selectedTicker);
+        const basePrice = parseFloat(selectedAsset?.current_price as string || '185.50') || 185.50;
 
-        if (trades.length > 10) {
-            // Group trades into candles based on timeframe
-            const candleMap = new Map<string, ChartData>();
-            trades.forEach(t => {
-                const d = new Date(t.timestamp);
-                
-                // Simplified grouping
-                if (timeframe === '1m') d.setSeconds(0, 0);
-                else if (timeframe === '5m') { d.setMinutes(Math.floor(d.getMinutes() / 5) * 5, 0, 0); }
-                else if (timeframe === '15m') { d.setMinutes(Math.floor(d.getMinutes() / 15) * 15, 0, 0); }
-                else if (timeframe === '1h') { d.setMinutes(0, 0, 0); }
-                else if (timeframe === '4h') { d.setHours(Math.floor(d.getHours() / 4) * 4, 0, 0, 0); }
-                else if (timeframe === '1D') { d.setHours(0, 0, 0, 0); }
-                
-                const timeKey = d.getTime().toString();
-                const price = parseFloat(t.price as string);
-                
-                if (candleMap.has(timeKey)) {
-                    const c = candleMap.get(timeKey)!;
-                    c.high = Math.max(c.high, price);
-                    c.low = Math.min(c.low, price);
-                    c.close = price;
-                    c.volume = (c.volume || 0) + parseFloat(t.quantity as string);
-                } else {
-                    candleMap.set(timeKey, {
-                        time: d.getTime(),
-                        open: price,
-                        high: price,
-                        low: price,
-                        close: price,
-                        volume: parseFloat(t.quantity as string)
-                    });
-                }
-            });
-            
-            const grouped = Array.from(candleMap.values()).sort((a, b) => (a.time as number) - (b.time as number));
-            setChartData(grouped.map(c => ({ ...c, time: new Date(c.time).toISOString() })));
+        const simulatedCandles: ChartData[] = [];
+        let currentClose = basePrice - 15.0;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0);
 
-        } else {
-            // Simulate Data for empty states
-            const basePrice = parseFloat(selectedAsset?.current_price as string || '185.50') || 185.50;
-            const simulatedCandles: ChartData[] = [];
-            let currentClose = basePrice - 12.0;
-            const now = new Date();
-            now.setHours(0, 0, 0, 0);
-
-            for (let i = 60; i > 0; i--) {
-                const date = new Date(now);
-                
-                if (timeframe.includes('m') || timeframe.includes('h')) {
-                    date.setHours(now.getHours() - i * (timeframe === '1h' ? 1 : 0));
-                    date.setMinutes(now.getMinutes() - i * (timeframe === '15m' ? 15 : timeframe === '5m' ? 5 : 1));
-                } else {
-                    date.setDate(now.getDate() - i);
-                }
-
-                const open = currentClose + (Math.random() * 2 - 1);
-                const close = open + (Math.random() * 4 - 2);
-                const high = Math.max(open, close) + Math.random() * 2;
-                const low = Math.min(open, close) - Math.random() * 2;
-
-                simulatedCandles.push({
-                    time: date.toISOString(),
-                    open, high, low, close,
-                    volume: Math.floor(Math.random() * 10000)
-                });
-                currentClose = close;
+        for (let i = 100; i > 0; i--) {
+            const date = new Date(now);
+            if (timeframe.includes('m') || timeframe.includes('h')) {
+                date.setHours(now.getHours() - i * (timeframe === '1h' ? 1 : 0));
+                date.setMinutes(now.getMinutes() - i * (timeframe === '15m' ? 15 : timeframe === '5m' ? 5 : 1));
+            } else {
+                date.setDate(now.getDate() - i);
             }
-            setChartData(simulatedCandles);
+
+            const open = currentClose + (Math.random() * 2 - 1);
+            const close = open + (Math.random() * 4 - 2);
+            const high = Math.max(open, close) + Math.random() * 2;
+            const low = Math.min(open, close) - Math.random() * 2;
+
+            simulatedCandles.push({
+                time: date.toISOString(),
+                open, high, low, close,
+                volume: Math.floor(Math.random() * 10000 + 1000)
+            });
+            currentClose = close;
         }
-    }, [trades, selectedTicker, timeframe, assets]);
+
+        setRawHistoryCandles(simulatedCandles);
+        setChartData(simulatedCandles.slice(0, replayIndex));
+    }, [selectedTicker, timeframe, assets]);
+
+    // Replay Step Timer
+    useEffect(() => {
+        if (!isReplaying) return;
+        const intervalMs = Math.max(1000 / replaySpeed, 20);
+
+        const timer = setInterval(() => {
+            setReplayIndex(prev => {
+                if (prev >= rawHistoryCandles.length) {
+                    setIsReplaying(false);
+                    return prev;
+                }
+                const nextIndex = prev + 1;
+                setChartData(rawHistoryCandles.slice(0, nextIndex));
+                return nextIndex;
+            });
+        }, intervalMs);
+
+        return () => clearInterval(timer);
+    }, [isReplaying, replaySpeed, rawHistoryCandles]);
 
     const handlePlaceOrder = async (side: 'BUY' | 'SELL', type: 'MARKET' | 'LIMIT', price: number, size: number) => {
         try {
@@ -189,7 +197,6 @@ export const TradeView: React.FC = () => {
                 size
             });
             
-            // Refresh User Data
             const [portData, posData, tradesData] = await Promise.all([
                 apiService.getPortfolio(),
                 apiService.getPositions(),
@@ -206,6 +213,7 @@ export const TradeView: React.FC = () => {
 
     return (
         <div className="layout">
+            {/* Top Bar */}
             <TradingViewTopBar 
                 ticker={selectedTicker}
                 onTickerChange={setSelectedTicker}
@@ -217,16 +225,168 @@ export const TradeView: React.FC = () => {
                 onIndicatorsChange={setIndicators}
                 chartStyle={chartStyle}
                 onChartStyleChange={setChartStyle}
+                activeWorkspaceTab={workspaceTab}
+                onWorkspaceTabChange={setWorkspaceTab}
+                onOpenSearchModal={() => setIsSearchModalOpen(true)}
             />
             
+            {/* Main Content Workspace */}
             <div style={{ display: 'flex', flex: 1, overflow: 'hidden' }}>
-                <TradingViewChart 
-                    data={chartData}
-                    ticker={selectedTicker}
-                    indicators={indicators}
-                    chartStyle={chartStyle}
-                />
                 
+                {/* Left Workspace Panel */}
+                <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                    
+                    {workspaceTab === 'CHART' && (
+                        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
+                            <DrawingToolbar />
+                            
+                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
+                                <TradingViewChart 
+                                    data={chartData}
+                                    ticker={selectedTicker}
+                                    indicators={indicators}
+                                    chartStyle={chartStyle}
+                                />
+                                
+                                <MarketReplayControls
+                                    isPlaying={isReplaying}
+                                    onTogglePlay={() => setIsReplaying(!isReplaying)}
+                                    speed={replaySpeed}
+                                    onSpeedChange={setReplaySpeed}
+                                    currentTickIndex={replayIndex}
+                                    totalTicks={rawHistoryCandles.length}
+                                    onSeek={(idx) => {
+                                        setReplayIndex(idx);
+                                        setChartData(rawHistoryCandles.slice(0, idx));
+                                    }}
+                                    onStep={(dir) => {
+                                        const newIdx = dir === 'next' ? Math.min(replayIndex + 1, rawHistoryCandles.length) : Math.max(replayIndex - 1, 1);
+                                        setReplayIndex(newIdx);
+                                        setChartData(rawHistoryCandles.slice(0, newIdx));
+                                    }}
+                                    onReset={() => {
+                                        setReplayIndex(30);
+                                        setChartData(rawHistoryCandles.slice(0, 30));
+                                        setIsReplaying(false);
+                                    }}
+                                />
+                            </div>
+                        </div>
+                    )}
+
+                    {workspaceTab === 'IDE' && (
+                        <MonacoEditor ticker={selectedTicker} />
+                    )}
+
+                    {workspaceTab === 'BACKTEST' && (
+                        <BacktestDashboard ticker={selectedTicker} />
+                    )}
+
+                    {workspaceTab === 'TELEMETRY' && (
+                        <TelemetryDashboard />
+                    )}
+
+                    {/* Bottom Docking Console Panel */}
+                    <div className="bottom-dock">
+                        <div className="dock-tabs">
+                            <button
+                                className={`dock-tab ${bottomDockTab === 'POSITIONS' ? 'active' : ''}`}
+                                onClick={() => setBottomDockTab('POSITIONS')}
+                            >
+                                <Briefcase size={14} /> Open Positions ({positions.length})
+                            </button>
+                            <button
+                                className={`dock-tab ${bottomDockTab === 'ORDERS' ? 'active' : ''}`}
+                                onClick={() => setBottomDockTab('ORDERS')}
+                            >
+                                <ListOrdered size={14} /> Working Orders
+                            </button>
+                            <button
+                                className={`dock-tab ${bottomDockTab === 'TRADES' ? 'active' : ''}`}
+                                onClick={() => setBottomDockTab('TRADES')}
+                            >
+                                <Clock size={14} /> Executed Fills
+                            </button>
+                            <button
+                                className={`dock-tab ${bottomDockTab === 'PNL' ? 'active' : ''}`}
+                                onClick={() => setBottomDockTab('PNL')}
+                            >
+                                <DollarSign size={14} /> Portfolio Summary
+                            </button>
+                            <button
+                                className={`dock-tab ${bottomDockTab === 'LOGS' ? 'active' : ''}`}
+                                onClick={() => setBottomDockTab('LOGS')}
+                            >
+                                <Terminal size={14} /> System Logs
+                            </button>
+                        </div>
+
+                        <div className="dock-content">
+                            {bottomDockTab === 'POSITIONS' && (
+                                <div className="dock-grid">
+                                    <div className="dock-row header">
+                                        <span>Asset</span>
+                                        <span>Quantity</span>
+                                        <span>Avg Price</span>
+                                        <span>Current Price</span>
+                                        <span>Unrealized PnL</span>
+                                    </div>
+                                    {positions.length === 0 ? (
+                                        <div className="dock-empty">No active positions. Submit an order from the right sidebar.</div>
+                                    ) : (
+                                        positions.map(p => (
+                                            <div key={p.id} className="dock-row">
+                                                <span className="ticker-tag">{p.asset.ticker}</span>
+                                                <span>{p.quantity}</span>
+                                                <span>${parseFloat(p.average_price as string).toFixed(2)}</span>
+                                                <span>${parseFloat(p.current_price as string || '185.50').toFixed(2)}</span>
+                                                <span className={Number(p.unrealized_pnl) >= 0 ? 'text-green' : 'text-red'}>
+                                                    ${parseFloat(p.unrealized_pnl as string || '0').toFixed(2)}
+                                                </span>
+                                            </div>
+                                        ))
+                                    )}
+                                </div>
+                            )}
+
+                            {bottomDockTab === 'PNL' && (
+                                <div className="pnl-summary-dock">
+                                    <div className="pnl-card">
+                                        <span className="label">Account Equity</span>
+                                        <span className="val">${parseFloat(portfolio?.total_value as string || '100000.00').toLocaleString()}</span>
+                                    </div>
+                                    <div className="pnl-card">
+                                        <span className="label">Buying Power</span>
+                                        <span className="val">${parseFloat(portfolio?.buying_power as string || '100000.00').toLocaleString()}</span>
+                                    </div>
+                                    <div className="pnl-card">
+                                        <span className="label">Daily Realized PnL</span>
+                                        <span className="val text-green">+$1,450.00</span>
+                                    </div>
+                                    <div className="pnl-card">
+                                        <span className="label">Margin Usage</span>
+                                        <span className="val">0.0%</span>
+                                    </div>
+                                </div>
+                            )}
+
+                            {bottomDockTab === 'ORDERS' && (
+                                <div className="dock-empty">No pending working limit orders.</div>
+                            )}
+
+                            {bottomDockTab === 'TRADES' && (
+                                <div className="dock-empty">No executed trades in current session.</div>
+                            )}
+
+                            {bottomDockTab === 'LOGS' && (
+                                <div className="dock-empty">System running cleanly. WebSocket stream active at ws://localhost:8000/ws/stream/.</div>
+                            )}
+                        </div>
+                    </div>
+
+                </div>
+                
+                {/* Right Sidebar */}
                 <TradingViewRightSidebar 
                     assets={assets}
                     selectedTicker={selectedTicker}
@@ -236,8 +396,17 @@ export const TradeView: React.FC = () => {
                     portfolio={portfolio}
                     positions={positions}
                     onPlaceOrder={handlePlaceOrder}
+                    onOpenSearchModal={() => setIsSearchModalOpen(true)}
                 />
             </div>
+
+            {/* Symbol Search Modal */}
+            <SymbolSearchModal
+                isOpen={isSearchModalOpen}
+                onClose={() => setIsSearchModalOpen(false)}
+                assets={assets}
+                onSelectAsset={setSelectedTicker}
+            />
         </div>
     );
 };

@@ -2,10 +2,6 @@ import React, { useEffect, useRef, useState } from 'react';
 import { 
     createChart, 
     ColorType, 
-    CandlestickSeries, 
-    HistogramSeries, 
-    LineSeries, 
-    AreaSeries,
     type IChartApi, 
     type ISeriesApi 
 } from 'lightweight-charts';
@@ -84,10 +80,12 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
         chartRef.current = chart;
 
         // Create Volume series overlay
-        const volumeSeries = chart.addSeries(HistogramSeries, {
+        const volumeSeries = chart.addHistogramSeries({
             color: '#10b981',
             priceFormat: { type: 'volume' },
             priceScaleId: '', // set as an overlay by setting a blank priceScaleId
+        });
+        volumeSeries.priceScale().applyOptions({
             scaleMargins: {
                 top: 0.8, // highest point of the series will be at 80% from the top
                 bottom: 0,
@@ -143,16 +141,16 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         let newMainSeries: ISeriesApi<any>;
         if (chartStyle === 'LINE') {
-            newMainSeries = chartRef.current.addSeries(LineSeries, { color: '#3b82f6', lineWidth: 2 });
+            newMainSeries = chartRef.current.addLineSeries({ color: '#3b82f6', lineWidth: 2 });
         } else if (chartStyle === 'AREA') {
-            newMainSeries = chartRef.current.addSeries(AreaSeries, {
+            newMainSeries = chartRef.current.addAreaSeries({
                 lineColor: '#3b82f6',
                 topColor: 'rgba(59, 130, 246, 0.4)',
                 bottomColor: 'rgba(59, 130, 246, 0.0)',
                 lineWidth: 2,
             });
         } else {
-            newMainSeries = chartRef.current.addSeries(CandlestickSeries, {
+            newMainSeries = chartRef.current.addCandlestickSeries({
                 upColor: '#10b981',
                 downColor: '#ef4444',
                 borderVisible: false,
