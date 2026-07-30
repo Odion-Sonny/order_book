@@ -75,6 +75,10 @@ const TradeView = () => {
 
         const fetchData = async () => {
             try {
+                // 0. Refresh Assets for Live Watchlist
+                const updatedAssets = await apiService.getAssets();
+                setAssets(updatedAssets);
+
                 // 1. Fetch Trades
                 const allTrades = await apiService.getTrades();
                 const assetTrades = allTrades
@@ -175,23 +179,43 @@ const TradeView = () => {
         ws.onmessage = (event) => {
             try {
                 const data = JSON.parse(event.data);
-                if (data.type === 'bar' && data.data.symbol === selectedTicker) {
+                if (data.type === 'bar' && data.data) {
                     const bar = data.data;
-                    setChartData(prev => {
-                        const newBar = {
-                            time: bar.timestamp.split('T')[0],
-                            open: parseFloat(bar.open),
-                            high: parseFloat(bar.high),
-                            low: parseFloat(bar.low),
-                            close: parseFloat(bar.close),
-                            volume: parseFloat(bar.volume || 0)
-                        };
-                        const last = prev[prev.length - 1];
-                        if (last && last.time === newBar.time) {
-                            return [...prev.slice(0, -1), newBar];
+
+                    // Update live Watchlist asset prices dynamically
+                    setAssets(prev => prev.map(a => {
+                        if (a.ticker === bar.symbol) {
+                            const newP = parseFloat(bar.close);
+                            const oldP = parseFloat(a.current_price || '0') || newP;
+                            const diff = newP - oldP;
+                            const pct = oldP > 0 ? (diff / oldP) * 100 : 0;
+                            return {
+                                ...a,
+                                current_price: newP.toFixed(2),
+                                price_change: diff.toFixed(2),
+                                price_change_percent: pct.toFixed(2)
+                            };
                         }
-                        return [...prev, newBar];
-                    });
+                        return a;
+                    }));
+
+                    if (bar.symbol === selectedTicker) {
+                        setChartData(prev => {
+                            const newBar = {
+                                time: bar.timestamp.split('T')[0],
+                                open: parseFloat(bar.open),
+                                high: parseFloat(bar.high),
+                                low: parseFloat(bar.low),
+                                close: parseFloat(bar.close),
+                                volume: parseFloat(bar.volume || 0)
+                            };
+                            const last = prev[prev.length - 1];
+                            if (last && last.time === newBar.time) {
+                                return [...prev.slice(0, -1), newBar];
+                            }
+                            return [...prev, newBar];
+                        });
+                    }
                 }
             } catch (e) {
                 console.error("WS error parsing message", e);
