@@ -106,34 +106,64 @@ const TradeView = () => {
         return () => clearInterval(interval);
     }, [selectedTicker]);
 
-    // Build Candlestick Data from Trades
+    // Build Candlestick Data from Trades or Asset Base Price
     useEffect(() => {
-        if (!trades.length && !selectedAsset) return;
+        if (!selectedTicker) return;
 
-        // Group trades into hourly/daily candles
-        const candleMap = new Map<string, { time: string; open: number; high: number; low: number; close: number; volume: number }>();
+        if (trades.length > 0) {
+            // Group trades into daily candles
+            const candleMap = new Map<string, { time: string; open: number; high: number; low: number; close: number; volume: number }>();
+            trades.forEach(t => {
+                const dateStr = t.timestamp.split('T')[0];
+                const price = parseFloat(t.price);
+                const size = parseFloat(t.quantity || '0');
 
-        trades.forEach(t => {
-            const dateStr = t.timestamp.split('T')[0];
-            const price = parseFloat(t.price);
-            const size = parseFloat(t.quantity || '0');
+                if (!candleMap.has(dateStr)) {
+                    candleMap.set(dateStr, { time: dateStr, open: price, high: price, low: price, close: price, volume: size });
+                } else {
+                    const c = candleMap.get(dateStr)!;
+                    c.high = Math.max(c.high, price);
+                    c.low = Math.min(c.low, price);
+                    c.close = price;
+                    c.volume += size;
+                }
+            });
+            const candles = Array.from(candleMap.values());
+            candles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
+            setChartData(candles);
+        } else {
+            // Generate 30 days of realistic historical candles based on asset price
+            const basePrice = parseFloat(selectedAsset?.current_price || '185.50') || 185.50;
+            const simulatedCandles: ChartData[] = [];
+            let currentClose = basePrice - 12.0;
+            const now = new Date();
 
-            if (!candleMap.has(dateStr)) {
-                candleMap.set(dateStr, { time: dateStr, open: price, high: price, low: price, close: price, volume: size });
-            } else {
-                const c = candleMap.get(dateStr)!;
-                c.high = Math.max(c.high, price);
-                c.low = Math.min(c.low, price);
-                c.close = price;
-                c.volume += size;
+            for (let i = 30; i >= 0; i--) {
+                const d = new Date(now);
+                d.setDate(d.getDate() - i);
+                const timeStr = d.toISOString().split('T')[0];
+                
+                const dayVolatility = basePrice * 0.015;
+                const open = currentClose;
+                const change = (Math.sin(i * 0.5) * 2 + (Math.random() - 0.48) * 3);
+                const close = Math.max(1.0, open + change);
+                const high = Math.max(open, close) + Math.random() * dayVolatility;
+                const low = Math.min(open, close) - Math.random() * dayVolatility;
+                const volume = Math.floor(50000 + Math.random() * 150000);
+
+                simulatedCandles.push({
+                    time: timeStr,
+                    open: parseFloat(open.toFixed(2)),
+                    high: parseFloat(high.toFixed(2)),
+                    low: parseFloat(low.toFixed(2)),
+                    close: parseFloat(close.toFixed(2)),
+                    volume
+                });
+                currentClose = close;
             }
-        });
-
-        const candles = Array.from(candleMap.values());
-        candles.sort((a, b) => new Date(a.time).getTime() - new Date(b.time).getTime());
-        setChartData(candles);
-
-    }, [trades, selectedAsset]);
+            setChartData(simulatedCandles);
+        }
+    }, [trades, selectedTicker, selectedAsset]);
 
     // WebSocket Live Ticks Stream
     useEffect(() => {

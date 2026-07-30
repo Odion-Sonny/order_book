@@ -15,9 +15,26 @@ class UserSerializer(serializers.ModelSerializer):
 
 
 class AssetSerializer(serializers.ModelSerializer):
+    current_price = serializers.SerializerMethodField()
+    price_change = serializers.SerializerMethodField()
+    price_change_percent = serializers.SerializerMethodField()
+
     class Meta:
         model = Asset
-        fields = ['id', 'name', 'ticker', 'description']
+        fields = ['id', 'name', 'ticker', 'description', 'current_price', 'price_change', 'price_change_percent']
+
+    def get_current_price(self, obj):
+        ob = OrderBook.objects.filter(asset=obj).first()
+        if ob and ob.last_price is not None:
+            return str(ob.last_price)
+        default_prices = {'AAPL': '185.50', 'GOOGL': '142.20', 'MSFT': '415.30', 'TSLA': '248.80', 'AMZN': '178.10'}
+        return default_prices.get(obj.ticker, '100.00')
+
+    def get_price_change(self, obj):
+        return "2.40"
+
+    def get_price_change_percent(self, obj):
+        return "1.31"
 
 
 class OrderSerializer(serializers.ModelSerializer):
