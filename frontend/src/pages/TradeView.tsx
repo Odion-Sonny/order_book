@@ -3,13 +3,11 @@ import { apiService } from '../services/api';
 import type { Asset, OrderBookData, Trade, ChartData, Portfolio, Position } from '../types';
 
 import { TradingViewTopBar } from '../components/trading/TradingViewTopBar';
-import { TradingViewChart } from '../components/trading/TradingViewChart';
 import { TradingViewRightSidebar } from '../components/trading/TradingViewRightSidebar';
-import { DrawingToolbar } from '../components/trading/DrawingToolbar';
-import { MarketReplayControls } from '../components/trading/MarketReplayControls';
 import { MonacoEditor } from '../components/trading/MonacoEditor';
 import { BacktestDashboard } from '../components/trading/BacktestDashboard';
 import { TelemetryDashboard } from '../components/trading/TelemetryDashboard';
+import { MultiChartLayout } from '../components/trading/MultiChartLayout';
 import { SymbolSearchModal } from '../components/trading/SymbolSearchModal';
 
 import { Briefcase, ListOrdered, DollarSign, Clock, Terminal } from 'lucide-react';
@@ -326,46 +324,35 @@ export const TradeView: React.FC = () => {
                 <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
                     
                     {workspaceTab === 'CHART' && (
-                        <div style={{ display: 'flex', flex: 1, overflow: 'hidden', position: 'relative' }}>
-                            <DrawingToolbar
-                                activeTool={activeDrawingTool}
-                                onSelectTool={setActiveDrawingTool}
-                            />
-                            
-                            <div style={{ display: 'flex', flexDirection: 'column', flex: 1, overflow: 'hidden' }}>
-                                <TradingViewChart 
-                                    data={chartData}
-                                    ticker={selectedTicker}
-                                    indicators={indicators}
-                                    chartStyle={chartStyle}
-                                    activeTool={activeDrawingTool}
-                                    onResetTool={() => setActiveDrawingTool('pointer')}
-                                />
-                                
-                                <MarketReplayControls
-                                    isPlaying={isReplaying}
-                                    onTogglePlay={() => setIsReplaying(!isReplaying)}
-                                    speed={replaySpeed}
-                                    onSpeedChange={setReplaySpeed}
-                                    currentTickIndex={replayIndex}
-                                    totalTicks={rawHistoryCandles.length}
-                                    onSeek={(idx) => {
-                                        setReplayIndex(idx);
-                                        setChartData(rawHistoryCandles.slice(0, idx));
-                                    }}
-                                    onStep={(dir) => {
-                                        const newIdx = dir === 'next' ? Math.min(replayIndex + 1, rawHistoryCandles.length) : Math.max(replayIndex - 1, 1);
-                                        setReplayIndex(newIdx);
-                                        setChartData(rawHistoryCandles.slice(0, newIdx));
-                                    }}
-                                    onReset={() => {
-                                        setReplayIndex(30);
-                                        setChartData(rawHistoryCandles.slice(0, 30));
-                                        setIsReplaying(false);
-                                    }}
-                                />
-                            </div>
-                        </div>
+                        <MultiChartLayout
+                            primaryData={chartData}
+                            primaryTicker={selectedTicker}
+                            indicators={indicators}
+                            chartStyle={chartStyle}
+                            activeTool={activeDrawingTool}
+                            onSelectTool={setActiveDrawingTool}
+                            onResetTool={() => setActiveDrawingTool('pointer')}
+                            isReplaying={isReplaying}
+                            onTogglePlay={() => setIsReplaying(!isReplaying)}
+                            replaySpeed={replaySpeed}
+                            onSpeedChange={setReplaySpeed}
+                            currentTickIndex={replayIndex}
+                            totalTicks={rawHistoryCandles.length}
+                            onSeek={(idx) => {
+                                setReplayIndex(idx);
+                                setChartData(rawHistoryCandles.slice(0, idx));
+                            }}
+                            onStep={(dir) => {
+                                const newIdx = dir === 'next' ? Math.min(replayIndex + 1, rawHistoryCandles.length) : Math.max(replayIndex - 1, 1);
+                                setReplayIndex(newIdx);
+                                setChartData(rawHistoryCandles.slice(0, newIdx));
+                            }}
+                            onResetReplay={() => {
+                                setReplayIndex(30);
+                                setChartData(rawHistoryCandles.slice(0, 30));
+                                setIsReplaying(false);
+                            }}
+                        />
                     )}
 
                     {workspaceTab === 'IDE' && (
