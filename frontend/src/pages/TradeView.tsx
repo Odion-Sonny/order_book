@@ -118,9 +118,12 @@ const TradeView = () => {
             // Group trades into daily candles
             const candleMap = new Map<string, { time: string; open: number; high: number; low: number; close: number; volume: number }>();
             trades.forEach(t => {
-                const dateStr = t.timestamp.split('T')[0];
-                const price = parseFloat(t.price);
-                const size = parseFloat(t.quantity || '0');
+                const ts = (t as any).executed_at || t.timestamp;
+                const dateStr = (typeof ts === 'string' && ts.includes('T'))
+                    ? ts.split('T')[0]
+                    : new Date().toISOString().split('T')[0];
+                const price = parseFloat(t.price || '0');
+                const size = parseFloat((t as any).size || t.quantity || '0');
 
                 if (!candleMap.has(dateStr)) {
                     candleMap.set(dateStr, { time: dateStr, open: price, high: price, low: price, close: price, volume: size });
