@@ -15,12 +15,7 @@ import os
 from pathlib import Path
 import environ
 
-env = environ.Env()
-environ.Env.read_env()
-
-ALPACA_API_KEY = env("ALPACA_API_KEY")
-ALPACA_SECRET_KEY = env("ALPACA_SECRET_KEY")
-ALPACA_BASE_URL = env("ALPACA_BASE_URL")
+BASE_DIR = Path(__file__).resolve().parent.parent
 
 # Initialize environ
 env = environ.Env(
@@ -30,8 +25,11 @@ env = environ.Env(
 )
 
 # Read .env file
-BASE_DIR = Path(__file__).resolve().parent.parent
 environ.Env.read_env(os.path.join(BASE_DIR, '.env'))
+
+ALPACA_API_KEY = env("ALPACA_API_KEY", default="PK_PAPER_DEMO_KEY")
+ALPACA_SECRET_KEY = env("ALPACA_SECRET_KEY", default="SK_PAPER_DEMO_SECRET")
+ALPACA_BASE_URL = env("ALPACA_BASE_URL", default="https://paper-api.alpaca.markets")
 
 # SECURITY WARNING: keep the secret key used in production secret!
 SECRET_KEY = env('DJANGO_SECRET_KEY')
@@ -60,8 +58,14 @@ INSTALLED_APPS = [
     'rest_framework',
     'rest_framework_simplejwt',
     'corsheaders',
-    'drf_yasg',
 ]
+
+try:
+    import pkg_resources
+    import drf_yasg
+    INSTALLED_APPS.append('drf_yasg')
+except Exception:
+    pass
 
 MIDDLEWARE = [
     'corsheaders.middleware.CorsMiddleware',

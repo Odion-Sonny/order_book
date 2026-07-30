@@ -27,6 +27,9 @@ class Command(BaseCommand):
 
         async def bar_handler(bar):
             # Broadcast to channel layer
+            cl = get_channel_layer()
+            if not cl:
+                return
             data = {
                 'symbol': bar.symbol,
                 'open': bar.open,
@@ -36,7 +39,7 @@ class Command(BaseCommand):
                 'volume': bar.volume,
                 'timestamp': bar.timestamp.isoformat() if hasattr(bar.timestamp, 'isoformat') else str(bar.timestamp)
             }
-            await channel_layer.group_send(
+            await cl.group_send(
                 'live_stream',
                 {
                     'type': 'stream.message',
@@ -45,13 +48,16 @@ class Command(BaseCommand):
             )
 
         async def trade_handler(trade):
+            cl = get_channel_layer()
+            if not cl:
+                return
             data = {
                 'symbol': trade.symbol,
                 'price': trade.price,
                 'size': trade.size,
                 'timestamp': trade.timestamp.isoformat() if hasattr(trade.timestamp, 'isoformat') else str(trade.timestamp)
             }
-            await channel_layer.group_send(
+            await cl.group_send(
                 'live_stream',
                 {
                     'type': 'stream.message',
