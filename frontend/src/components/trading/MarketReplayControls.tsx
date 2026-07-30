@@ -1,5 +1,5 @@
-import React from 'react';
-import { Play, Pause, SkipBack, SkipForward, FastForward, Bookmark, RefreshCw } from 'lucide-react';
+import React, { useState } from 'react';
+import { Play, Pause, SkipBack, SkipForward, FastForward, Bookmark, RefreshCw, Calendar } from 'lucide-react';
 
 interface MarketReplayControlsProps {
     isPlaying: boolean;
@@ -11,6 +11,7 @@ interface MarketReplayControlsProps {
     onSeek: (index: number) => void;
     onStep: (direction: 'prev' | 'next') => void;
     onReset: () => void;
+    onJumpToYear?: (year: number) => void;
 }
 
 export const MarketReplayControls: React.FC<MarketReplayControlsProps> = ({
@@ -22,10 +23,21 @@ export const MarketReplayControls: React.FC<MarketReplayControlsProps> = ({
     totalTicks,
     onSeek,
     onStep,
-    onReset
+    onReset,
+    onJumpToYear
 }) => {
+    const [selectedYear, setSelectedYear] = useState<number>(2026);
     const speeds = [1, 2, 5, 20, 100];
+    const years = [2021, 2022, 2023, 2024, 2025, 2026];
     const progressPct = totalTicks > 0 ? (currentTickIndex / totalTicks) * 100 : 0;
+
+    const handleYearSelect = (yr: number) => {
+        setSelectedYear(yr);
+        if (onJumpToYear) onJumpToYear(yr);
+        const fraction = (yr - 2021) / 5;
+        const targetIndex = Math.floor(fraction * totalTicks);
+        onSeek(Math.min(targetIndex, Math.max(totalTicks - 1, 0)));
+    };
 
     return (
         <div className="replay-bar">
@@ -34,24 +46,39 @@ export const MarketReplayControls: React.FC<MarketReplayControlsProps> = ({
                     {isPlaying ? '● REPLAYING' : '❚❚ PAUSED'}
                 </span>
                 <span className="replay-clock">
-                    Tick #{currentTickIndex} / {totalTicks}
+                    Bar #{currentTickIndex} / {totalTicks}
                 </span>
             </div>
 
             {/* Playback Controls */}
             <div className="replay-actions">
                 <button className="replay-btn" onClick={onReset} title="Reset Replay">
-                    <RefreshCw size={16} />
+                    <RefreshCw size={15} />
                 </button>
                 <button className="replay-btn" onClick={() => onStep('prev')} title="Step Back (←)">
-                    <SkipBack size={16} />
+                    <SkipBack size={15} />
                 </button>
                 <button className={`replay-btn play-btn ${isPlaying ? 'playing' : ''}`} onClick={onTogglePlay}>
-                    {isPlaying ? <Pause size={18} /> : <Play size={18} />}
+                    {isPlaying ? <Pause size={16} /> : <Play size={16} />}
                 </button>
                 <button className="replay-btn" onClick={() => onStep('next')} title="Step Forward (→)">
-                    <SkipForward size={16} />
+                    <SkipForward size={15} />
                 </button>
+            </div>
+
+            {/* 5-Year History Backlog Jump Bar */}
+            <div className="replay-history-jump">
+                <Calendar size={13} className="cal-icon" />
+                <span>5Y Backlog:</span>
+                {years.map(yr => (
+                    <button
+                        key={yr}
+                        className={`year-btn ${selectedYear === yr ? 'active' : ''}`}
+                        onClick={() => handleYearSelect(yr)}
+                    >
+                        '{String(yr).slice(2)}
+                    </button>
+                ))}
             </div>
 
             {/* Timeline Scrubber */}
@@ -81,8 +108,8 @@ export const MarketReplayControls: React.FC<MarketReplayControlsProps> = ({
                 ))}
             </div>
 
-            <button className="replay-btn bookmark-btn" title="Add Bookmark">
-                <Bookmark size={16} />
+            <button className="replay-btn bookmark-btn" title="Add Replay Bookmark">
+                <Bookmark size={15} />
             </button>
         </div>
     );

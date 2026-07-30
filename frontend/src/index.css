@@ -681,6 +681,33 @@ body {
   font-size: 11px;
 }
 
+.replay-history-jump {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 10px;
+  color: var(--text-muted);
+}
+
+.year-btn {
+  background: transparent;
+  border: 1px solid var(--border-color);
+  color: var(--text-muted);
+  padding: 1px 5px;
+  font-size: 10px;
+  font-weight: 700;
+  border-radius: 3px;
+  cursor: pointer;
+}
+
+.year-btn.active {
+  color: #00f2fe;
+  border-color: #00f2fe;
+  background: rgba(0, 242, 254, 0.1);
+}
+
+.cal-icon { color: #00f2fe; }
+
 .star-btn {
   background: transparent;
   border: none;
