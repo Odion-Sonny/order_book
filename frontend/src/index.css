@@ -624,6 +624,28 @@ body {
   background: rgba(239, 68, 68, 0.3);
 }
 
+.star-btn {
+  background: transparent;
+  border: none;
+  cursor: pointer;
+  padding: 2px 4px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: 3px;
+  transition: transform 0.15s;
+}
+
+.star-btn:hover {
+  transform: scale(1.2);
+}
+
+.wl-left {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
 .brand-logo {
   display: flex;
   align-items: center;

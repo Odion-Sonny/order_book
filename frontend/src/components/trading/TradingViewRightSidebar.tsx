@@ -1,8 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import type { Asset, OrderBookData, Trade, Position, Portfolio } from '../../types';
 import { Level2OrderBook } from './Level2OrderBook';
 import { TimeAndSales } from './TimeAndSales';
-import { Search } from 'lucide-react';
+import { Search, Star } from 'lucide-react';
 
 interface SidebarProps {
     assets: Asset[];
@@ -28,21 +28,46 @@ export const TradingViewRightSidebar: React.FC<SidebarProps> = ({
     onOpenSearchModal
 }) => {
     const [activeTab, setActiveTab] = useState<'ORDER' | 'BOOK' | 'TRADES'>('ORDER');
-    const [watchlistCategory, setWatchlistCategory] = useState<string>('ALL');
+    const [watchlistCategory, setWatchlistCategory] = useState<string>('FAVORITES');
+    const [favorites, setFavorites] = useState<string[]>(() => {
+        try {
+            const saved = localStorage.getItem('quant_trading_favorites');
+            return saved ? JSON.parse(saved) : ['AAPL', 'NVDA', 'BTC-USD'];
+        } catch {
+            return ['AAPL', 'NVDA', 'BTC-USD'];
+        }
+    });
+
     const [orderType, setOrderType] = useState<'LIMIT' | 'MARKET'>('LIMIT');
     const [orderPrice, setOrderPrice] = useState<string>('');
     const [orderSize, setOrderSize] = useState<string>('10');
 
+    useEffect(() => {
+        try {
+            localStorage.setItem('quant_trading_favorites', JSON.stringify(favorites));
+        } catch (e) {
+            // fallback
+        }
+    }, [favorites]);
+
+    const toggleFavorite = (e: React.MouseEvent, ticker: string) => {
+        e.stopPropagation();
+        setFavorites(prev => 
+            prev.includes(ticker) ? prev.filter(t => t !== ticker) : [...prev, ticker]
+        );
+    };
+
     const selectedAsset = assets.find(a => a.ticker === selectedTicker);
-    const position = positions.find(p => p.asset.ticker === selectedTicker);
+    const position = positions.find(p => p.asset?.ticker === selectedTicker);
     const currentPrice = parseFloat(selectedAsset?.current_price as string) || orderBook?.last_price || 185.50;
 
     const handleOrderSubmit = (side: 'BUY' | 'SELL') => {
         onPlaceOrder(side, orderType, parseFloat(orderPrice) || currentPrice, parseFloat(orderSize));
     };
 
-    const categories = ['ALL', 'TECH', 'ENERGY', 'CRYPTO', 'FOREX'];
+    const categories = ['FAVORITES', 'ALL', 'TECH', 'CRYPTO', 'FOREX', 'ENERGY'];
     const filteredWatchlist = assets.filter(a => {
+        if (watchlistCategory === 'FAVORITES') return favorites.includes(a.ticker);
         if (watchlistCategory === 'ALL') return true;
         return (a as any).category?.toUpperCase() === watchlistCategory;
     });
@@ -54,7 +79,7 @@ export const TradingViewRightSidebar: React.FC<SidebarProps> = ({
                 <div className="section-header">
                     <h3>Watchlists</h3>
                     <button className="search-trigger-btn" onClick={onOpenSearchModal} title="Search Symbols">
-                        <Search size={14} /> Symbol Search
+                        <Search size={14} /> Search
                     </button>
                 </div>
 
@@ -65,34 +90,50 @@ export const TradingViewRightSidebar: React.FC<SidebarProps> = ({
                             className={`wl-cat-btn ${watchlistCategory === cat ? 'active' : ''}`}
                             onClick={() => setWatchlistCategory(cat)}
                         >
-                            {cat}
+                            {cat === 'FAVORITES' ? '⭐ FAVS' : cat}
                         </button>
                     ))}
                 </div>
 
                 <div className="watchlist-list">
-                    {filteredWatchlist.map(asset => {
-                        const priceNum = parseFloat(asset.current_price as string || '0');
-                        const changeNum = Number(asset.change_24h || 0);
-                        return (
-                            <div 
-                                key={asset.ticker} 
-                                className={`watchlist-item ${selectedTicker === asset.ticker ? 'active' : ''}`}
-                                onClick={() => onSelectTicker(asset.ticker)}
-                            >
-                                <div className="wl-left">
-                                    <span className="wl-ticker">{asset.ticker}</span>
-                                    <span className="wl-name">{asset.name}</span>
+                    {filteredWatchlist.length === 0 ? (
+                        <div className="dock-empty" style={{ padding: '16px 8px' }}>
+                            {watchlistCategory === 'FAVORITES' ? 'No favorites starred. Click ⭐ next to any symbol to favorite it!' : 'No symbols found.'}
+                        </div>
+                    ) : (
+                        filteredWatchlist.map(asset => {
+                            const priceNum = parseFloat(asset.current_price as string || '0');
+                            const changeNum = Number(asset.change_24h || 0);
+                            const isFav = favorites.includes(asset.ticker);
+                            return (
+                                <div 
+                                    key={asset.ticker} 
+                                    className={`watchlist-item ${selectedTicker === asset.ticker ? 'active' : ''}`}
+                                    onClick={() => onSelectTicker(asset.ticker)}
+                                >
+                                    <div className="wl-left">
+                                        <button 
+                                            className={`star-btn ${isFav ? 'active' : ''}`} 
+                                            onClick={(e) => toggleFavorite(e, asset.ticker)}
+                                            title={isFav ? 'Remove Favorite' : 'Add Favorite'}
+                                        >
+                                            <Star size={13} fill={isFav ? '#f59e0b' : 'none'} color={isFav ? '#f59e0b' : '#666'} />
+                                        </button>
+                                        <div style={{ display: 'flex', flexDirection: 'column' }}>
+                                            <span className="wl-ticker">{asset.ticker}</span>
+                                            <span className="wl-name">{asset.name}</span>
+                                        </div>
+                                    </div>
+                                    <div className="wl-right">
+                                        <span className="wl-price">${priceNum.toFixed(2)}</span>
+                                        <span className={`wl-change ${changeNum >= 0 ? 'text-green' : 'text-red'}`}>
+                                            {changeNum >= 0 ? '+' : ''}{changeNum.toFixed(2)}%
+                                        </span>
+                                    </div>
                                 </div>
-                                <div className="wl-right">
-                                    <span className="wl-price">${priceNum.toFixed(2)}</span>
-                                    <span className={`wl-change ${changeNum >= 0 ? 'text-green' : 'text-red'}`}>
-                                        {changeNum >= 0 ? '+' : ''}{changeNum.toFixed(2)}%
-                                    </span>
-                                </div>
-                            </div>
-                        );
-                    })}
+                            );
+                        })
+                    )}
                 </div>
             </div>
 
