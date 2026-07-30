@@ -86,28 +86,33 @@ const History = () => {
                             orders.map(order => (
                                 <tr key={order.id} className="hover:bg-[#2C2C2E]">
                                     <td className="px-6 py-4 font-mono text-neutral-500">{String(order.id).slice(0, 8)}</td>
-                                    <td className="px-6 py-4 font-bold text-white">{order.asset_ticker}</td>
+                                    <td className="px-6 py-4 font-bold text-white">{order.asset_ticker || 'N/A'}</td>
                                     <td className={cn("px-6 py-4 font-bold", order.side === 'BUY' ? "text-emerald-500" : "text-red-500")}>{order.side}</td>
                                     <td className="px-6 py-4 text-neutral-400">{order.order_type}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-white">{order.quantity}</td>
+                                    <td className="px-6 py-4 text-right font-mono text-white">{(order as any).size || order.quantity || '0'}</td>
                                     <td className="px-6 py-4 text-right font-mono text-white">{order.price ? `$${order.price}` : 'MKT'}</td>
                                     <td className="px-6 py-4 text-right"><StatusBadge status={order.status} /></td>
-                                    <td className="px-6 py-4 text-right text-neutral-500">{new Date(order.created_at).toLocaleDateString()}</td>
+                                    <td className="px-6 py-4 text-right text-neutral-500">{order.created_at ? new Date(order.created_at).toLocaleDateString() : 'N/A'}</td>
                                 </tr>
                             ))
                         ) : (
-                            trades.map(trade => (
-                                <tr key={trade.id} className="hover:bg-[#2C2C2E]">
-                                    <td className="px-6 py-4 font-mono text-neutral-500">{trade.id.slice(0, 8)}</td>
-                                    <td className="px-6 py-4 font-bold text-white">{trade.order_id?.slice(0, 8) || 'N/A'}</td>
-                                    {/* Note: Trade type usually inferred from order, but for now assuming logic matches */}
-                                    <td className="px-6 py-4 text-white">EXECUTED</td>
-                                    <td className="px-6 py-4 text-right font-mono text-white">{trade.quantity}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-white">${parseFloat(trade.price).toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right font-mono text-white">${(parseFloat(trade.price) * parseFloat(trade.quantity)).toFixed(2)}</td>
-                                    <td className="px-6 py-4 text-right text-neutral-500">{new Date(trade.timestamp).toLocaleDateString()}</td>
-                                </tr>
-                            ))
+                            trades.map(trade => {
+                                const qty = (trade as any).size || trade.quantity || '0';
+                                const priceVal = parseFloat(trade.price || '0');
+                                const qtyVal = parseFloat(qty);
+                                const dateVal = (trade as any).executed_at || trade.timestamp;
+                                return (
+                                    <tr key={trade.id} className="hover:bg-[#2C2C2E]">
+                                        <td className="px-6 py-4 font-mono text-neutral-500">{String(trade.id).slice(0, 8)}</td>
+                                        <td className="px-6 py-4 font-bold text-white">{trade.asset_ticker || 'N/A'}</td>
+                                        <td className="px-6 py-4 text-white">EXECUTED</td>
+                                        <td className="px-6 py-4 text-right font-mono text-white">{qty}</td>
+                                        <td className="px-6 py-4 text-right font-mono text-white">${priceVal.toFixed(2)}</td>
+                                        <td className="px-6 py-4 text-right font-mono text-white">${(priceVal * qtyVal).toFixed(2)}</td>
+                                        <td className="px-6 py-4 text-right text-neutral-500">{dateVal ? new Date(dateVal).toLocaleDateString() : 'N/A'}</td>
+                                    </tr>
+                                );
+                            })
                         )}
                         {((view === 'ORDERS' && orders.length === 0) || (view === 'TRADES' && trades.length === 0)) && (
                             <tr><td colSpan={8} className="px-6 py-12 text-center text-neutral-500">No records found.</td></tr>

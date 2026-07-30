@@ -201,8 +201,11 @@ const TradeView = () => {
 
                     if (bar.symbol === selectedTicker) {
                         setChartData(prev => {
+                            const barTime = (typeof bar.timestamp === 'string' && bar.timestamp.includes('T'))
+                                ? bar.timestamp.split('T')[0]
+                                : new Date().toISOString().split('T')[0];
                             const newBar = {
-                                time: bar.timestamp.split('T')[0],
+                                time: barTime,
                                 open: parseFloat(bar.open),
                                 high: parseFloat(bar.high),
                                 low: parseFloat(bar.low),
