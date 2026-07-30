@@ -204,10 +204,12 @@ export const TradeView: React.FC = () => {
             const selectedAsset = assets.find(a => a.ticker === selectedTicker);
             const currentPx = parseFloat(selectedAsset?.current_price as string || '185.50');
             const newTrade: Trade = {
-                id: Date.now(),
+                id: String(Date.now()),
+                asset_ticker: selectedTicker,
                 price: (currentPx + (Math.random() * 0.4 - 0.2)).toFixed(2),
                 quantity: String(Math.floor(Math.random() * 300 + 10)),
                 side: Math.random() > 0.45 ? 'BUY' : 'SELL',
+                type: 'MARKET',
                 timestamp: new Date().toISOString()
             };
             setTrades(prev => [newTrade, ...prev.slice(0, 49)]);
@@ -261,33 +263,38 @@ export const TradeView: React.FC = () => {
             const cost = fillPrice * size;
 
             setPortfolio(prev => ({
+                id: prev?.id || 1,
+                user: prev?.user || 1,
+                cash_balance: '100000',
                 total_value: prev ? String(parseFloat(prev.total_value as string || '100000')) : '100000',
                 buying_power: prev ? String(parseFloat(prev.buying_power as string || '100000') - (side === 'BUY' ? cost : -cost)) : '95000',
-                cash: '100000'
-            }) as Portfolio);
+            }));
 
             setPositions(prev => {
                 const existing = prev.find(p => p.asset?.ticker === selectedTicker);
                 if (existing) {
-                    const newQty = side === 'BUY' ? existing.quantity + size : Math.max(existing.quantity - size, 0);
+                    const currentQty = Number(existing.quantity) || 0;
+                    const newQty = side === 'BUY' ? currentQty + size : Math.max(currentQty - size, 0);
                     return prev.map(p => p.asset?.ticker === selectedTicker ? { ...p, quantity: newQty } : p);
                 } else {
                     return [...prev, {
                         id: Date.now(),
-                        asset: { ticker: selectedTicker, name: selectedTicker, current_price: String(fillPrice) },
+                        asset: { id: 1, ticker: selectedTicker, name: selectedTicker, description: selectedTicker, current_price: String(fillPrice) },
                         quantity: size,
                         average_price: String(fillPrice),
                         current_price: String(fillPrice),
                         unrealized_pnl: '0.00'
-                    } as Position];
+                    }];
                 }
             });
 
             setTrades(prev => [{
-                id: Date.now(),
+                id: String(Date.now()),
+                asset_ticker: selectedTicker,
                 price: String(fillPrice),
                 quantity: String(size),
                 side,
+                type,
                 timestamp: new Date().toISOString()
             }, ...prev]);
         }

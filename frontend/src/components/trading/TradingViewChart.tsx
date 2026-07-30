@@ -207,7 +207,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         // Indicator 1: SMA (Simple Moving Average 20)
         if (indicators.sma && uniqueData.length >= 20) {
-            const smaLine = chartRef.current.addLineSeries({ color: '#00f2fe', lineWidth: 1.5, title: 'SMA 20' });
+            const smaLine = chartRef.current.addLineSeries({ color: '#00f2fe', lineWidth: 2, title: 'SMA 20' });
             const smaData = [];
             for (let i = 19; i < uniqueData.length; i++) {
                 const slice = uniqueData.slice(i - 19, i + 1);
@@ -220,7 +220,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         // Indicator 2: EMA / MACD
         if (indicators.macd && uniqueData.length >= 26) {
-            const emaLine = chartRef.current.addLineSeries({ color: '#f59e0b', lineWidth: 1.5, title: 'EMA 50' });
+            const emaLine = chartRef.current.addLineSeries({ color: '#f59e0b', lineWidth: 2, title: 'EMA 50' });
             const emaData = [];
             for (let i = 25; i < uniqueData.length; i++) {
                 const slice = uniqueData.slice(i - 25, i + 1);
@@ -253,7 +253,7 @@ export const TradingViewChart: React.FC<TradingViewChartProps> = ({
 
         // Indicator 4: RSI (Relative Strength Index)
         if (indicators.rsi && uniqueData.length >= 14) {
-            const rsiLine = chartRef.current.addLineSeries({ color: '#ec4899', lineWidth: 1.5, title: 'RSI 14' });
+            const rsiLine = chartRef.current.addLineSeries({ color: '#ec4899', lineWidth: 2, title: 'RSI 14' });
             const rsiData = [];
             for (let i = 14; i < uniqueData.length; i++) {
                 let gains = 0, losses = 0;
