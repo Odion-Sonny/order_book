@@ -6,7 +6,9 @@ import {
     Code2, 
     BarChart3, 
     Activity, 
-    TrendingUp 
+    TrendingUp,
+    Bell,
+    Filter
 } from 'lucide-react';
 import type { Asset } from '../../types';
 
@@ -24,9 +26,11 @@ interface TradingViewTopBarProps {
     activeWorkspaceTab: 'CHART' | 'IDE' | 'BACKTEST' | 'TELEMETRY';
     onWorkspaceTabChange: (tab: 'CHART' | 'IDE' | 'BACKTEST' | 'TELEMETRY') => void;
     onOpenSearchModal: () => void;
+    onOpenAlertsModal?: () => void;
+    onOpenScreenerModal?: () => void;
 }
 
-const timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1D', '1W'];
+const timeframes = ['1m', '5m', '15m', '30m', '1h', '4h', '1D', '1W', '1M'];
 
 export const TradingViewTopBar: React.FC<TradingViewTopBarProps> = ({
     ticker,
@@ -40,6 +44,8 @@ export const TradingViewTopBar: React.FC<TradingViewTopBarProps> = ({
     activeWorkspaceTab,
     onWorkspaceTabChange,
     onOpenSearchModal,
+    onOpenAlertsModal,
+    onOpenScreenerModal,
 }) => {
     return (
         <div className="topbar">
@@ -148,6 +154,22 @@ export const TradingViewTopBar: React.FC<TradingViewTopBarProps> = ({
             )}
             
             <div className="spacer" />
+
+            {/* Screener & Alerts Modal Triggers */}
+            <div className="topbar-section actions">
+                {onOpenScreenerModal && (
+                    <button className="mode-btn" onClick={onOpenScreenerModal} title="Open Stock Screener">
+                        <Filter size={15} /> Screener
+                    </button>
+                )}
+                {onOpenAlertsModal && (
+                    <button className="mode-btn" onClick={onOpenAlertsModal} title="Price Alerts">
+                        <Bell size={15} /> Alerts
+                    </button>
+                )}
+            </div>
+
+            <div className="divider" />
 
             {/* Live Feed Status Indicator */}
             <div className="live-status-pill">

@@ -9,6 +9,8 @@ import { BacktestDashboard } from '../components/trading/BacktestDashboard';
 import { TelemetryDashboard } from '../components/trading/TelemetryDashboard';
 import { MultiChartLayout } from '../components/trading/MultiChartLayout';
 import { SymbolSearchModal } from '../components/trading/SymbolSearchModal';
+import { PriceAlertsModal } from '../components/trading/PriceAlertsModal';
+import { StockScreenerModal } from '../components/trading/StockScreenerModal';
 
 import { Briefcase, ListOrdered, DollarSign, Clock, Terminal } from 'lucide-react';
 
@@ -32,6 +34,8 @@ export const TradeView: React.FC = () => {
     const [activeDrawingTool, setActiveDrawingTool] = useState<string>('pointer');
     const [indicators, setIndicators] = useState({ rsi: false, macd: false, bollinger: false, sma: true });
     const [isSearchModalOpen, setIsSearchModalOpen] = useState<boolean>(false);
+    const [isAlertsModalOpen, setIsAlertsModalOpen] = useState<boolean>(false);
+    const [isScreenerModalOpen, setIsScreenerModalOpen] = useState<boolean>(false);
 
     // Market Replay Engine State
     const [isReplaying, setIsReplaying] = useState<boolean>(false);
@@ -315,6 +319,8 @@ export const TradeView: React.FC = () => {
                 activeWorkspaceTab={workspaceTab}
                 onWorkspaceTabChange={setWorkspaceTab}
                 onOpenSearchModal={() => setIsSearchModalOpen(true)}
+                onOpenAlertsModal={() => setIsAlertsModalOpen(true)}
+                onOpenScreenerModal={() => setIsScreenerModalOpen(true)}
             />
             
             {/* Main Content Workspace */}
@@ -502,6 +508,22 @@ export const TradeView: React.FC = () => {
             <SymbolSearchModal
                 isOpen={isSearchModalOpen}
                 onClose={() => setIsSearchModalOpen(false)}
+                assets={assets}
+                onSelectAsset={setSelectedTicker}
+            />
+
+            {/* Price Alerts Modal */}
+            <PriceAlertsModal
+                isOpen={isAlertsModalOpen}
+                onClose={() => setIsAlertsModalOpen(false)}
+                assets={assets}
+                currentTicker={selectedTicker}
+            />
+
+            {/* Stock Screener Modal */}
+            <StockScreenerModal
+                isOpen={isScreenerModalOpen}
+                onClose={() => setIsScreenerModalOpen(false)}
                 assets={assets}
                 onSelectAsset={setSelectedTicker}
             />
