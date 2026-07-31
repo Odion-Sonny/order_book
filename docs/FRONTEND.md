@@ -20,6 +20,14 @@ python manage.py runserver                 # REST + ASGI
 python manage.py run_live_stream           # Alpaca -> ws/stream/ (tape + bars)
 ```
 
+### WSL note
+
+On a `/mnt/c` (drvfs) checkout the native SWC binary crashes the build worker with
+`SIGBUS`. Next falls back to the WASM compiler automatically when
+`@next/swc-linux-x64-*` is absent — the build is slower but correct, so leave those
+packages uninstalled here. Building from a Linux-native path (e.g. `~/`) gets the
+native speed back.
+
 ## Layout
 
 ```
