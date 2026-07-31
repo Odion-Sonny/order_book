@@ -6,25 +6,42 @@ import { api } from '@/lib/api';
 import { log } from './logStore';
 import type { BacktestResult, BacktestRun } from '@/types';
 
-export const STARTER_STRATEGY = `# Strategy runs against historical bars of the selected symbol.
-# The backtest engine calls on_bar() once per candle.
+/**
+ * Must define `on_data` — the engine checks for that exact name and silently
+ * falls back to a built-in MA crossover if it is missing.
+ *
+ * Signature (order_book/services/backtesting_engine.py):
+ *   on_data(data, cash, positions, buy, sell)
+ *     data      pandas DataFrame up to the current bar, columns:
+ *               timestamp, symbol, open, high, low, close, volume
+ *     cash      float, uninvested cash
+ *     positions dict {symbol: quantity}
+ *     buy/sell  callables (symbol, quantity)
+ *
+ * Runs under RestrictedPython: `pd`, `len`, `int` and `float` are available,
+ * imports and file access are not.
+ */
+export const STARTER_STRATEGY = `# Moving-average crossover.
+# Called once per bar with history up to that point.
 
 FAST, SLOW = 10, 30
+SYMBOL = "AAPL"
 
-def on_bar(ctx):
-    closes = ctx.history("close", SLOW)
-    if len(closes) < SLOW:
+def on_data(data, cash, positions, buy, sell):
+    bars = data[data['symbol'] == SYMBOL]
+    if len(bars) < SLOW:
         return
 
-    fast = sum(closes[-FAST:]) / FAST
-    slow = sum(closes) / SLOW
+    closes = bars['close']
+    fast = float(closes.tail(FAST).mean())
+    slow = float(closes.tail(SLOW).mean())
+    price = float(closes.iloc[-1])
+    held = positions.get(SYMBOL, 0)
 
-    if fast > slow and ctx.position == 0:
-        ctx.buy(size=10)
-        ctx.log(f"golden cross @ {ctx.price:.2f}")
-    elif fast < slow and ctx.position > 0:
-        ctx.sell(size=ctx.position)
-        ctx.log(f"death cross @ {ctx.price:.2f}")
+    if fast > slow and held == 0 and cash > price * 10:
+        buy(SYMBOL, 10)
+    elif fast < slow and held > 0:
+        sell(SYMBOL, held)
 `;
 
 interface StrategyState {

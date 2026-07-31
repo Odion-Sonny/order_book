@@ -7,6 +7,7 @@ import {
   CandlestickChart,
   Keyboard,
   LineChart,
+  LogIn,
   Moon,
   PanelBottom,
   PanelLeft,
@@ -14,6 +15,7 @@ import {
   Search,
   Sun,
   TrendingUp,
+  User,
 } from 'lucide-react';
 import { useState } from 'react';
 import { INDICATOR_LABELS, type IndicatorId } from '@/lib/indicators';
@@ -22,6 +24,7 @@ import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
 import { HISTORY_RANGES, TIMEFRAMES, useSymbolStore, type ChartType } from '@/store/symbolStore';
 import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
+import { useAuthStore } from '@/store/authStore';
 import type { StreamStatus } from '@/lib/ws';
 
 const CHART_TYPES: Array<{ id: ChartType; icon: typeof LineChart; label: string }> = [
@@ -79,6 +82,7 @@ export function TopBar({ streamStatus }: { streamStatus: StreamStatus }) {
   } = useSymbolStore();
   const snapshot = useMarketStore((s) => s.snapshots[symbol]);
   const livePrice = useMarketStore((s) => s.lastPrice[symbol]);
+  const { authenticated, username, logout, setModalOpen } = useAuthStore();
 
   const [indicatorsOpen, setIndicatorsOpen] = useState(false);
   const [helpOpen, setHelpOpen] = useState(false);
@@ -271,6 +275,26 @@ export function TopBar({ streamStatus }: { streamStatus: StreamStatus }) {
       <IconToggle label="Toggle theme (Ctrl Shift L)" onClick={layout.toggleTheme}>
         {layout.theme === 'dark' ? <Sun size={15} /> : <Moon size={15} />}
       </IconToggle>
+
+      {authenticated ? (
+        <button
+          type="button"
+          onClick={logout}
+          title="Sign out"
+          className="ml-1 flex items-center gap-1.5 rounded border border-line px-2 py-1 text-[11px] text-dim transition-colors hover:text-fg"
+        >
+          <User size={12} />
+          {username}
+        </button>
+      ) : (
+        <button
+          type="button"
+          onClick={() => setModalOpen(true)}
+          className="ml-1 flex items-center gap-1.5 rounded bg-accent px-2.5 py-1 text-[11px] font-semibold text-white"
+        >
+          <LogIn size={12} /> Sign in
+        </button>
+      )}
     </header>
   );
 }

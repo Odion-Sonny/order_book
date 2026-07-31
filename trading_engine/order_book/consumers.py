@@ -5,7 +5,14 @@ from channels.db import database_sync_to_async
 from .models import OrderBook, Order, Asset
 from .serializers import OrderBookSerializer
 from .services.alpaca_service import alpaca_service
-import aioredis
+
+# aioredis is only used by the legacy pub/sub consumer below and no longer imports
+# on Python 3.11+. Keep it optional so the rest of the socket routes still load.
+try:
+    import aioredis
+except Exception:  # pragma: no cover - depends on interpreter version
+    aioredis = None
+
 
 class OrderBookConsumer(AsyncWebsocketConsumer):
     def __init__(self, *args, **kwargs):
@@ -17,7 +24,12 @@ class OrderBookConsumer(AsyncWebsocketConsumer):
     async def connect(self):
         self.asset_ticker = self.scope['url_route']['kwargs']['asset_ticker']
         self.room_group_name = f'orderbook_{self.asset_ticker}'
-        
+
+        if aioredis is None:
+            # Use ws/orderbook/<ticker>/ instead; that route needs no Redis.
+            await self.close(code=4503)
+            return
+
         # Connect to Redis
         self.redis = await aioredis.create_redis_pool('redis://localhost')
         self.pubsub = self.redis.pubsub()

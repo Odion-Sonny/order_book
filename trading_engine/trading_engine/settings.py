@@ -177,15 +177,25 @@ ASGI_APPLICATION = 'trading_engine.asgi.application'
 #     }
 # }
 
-# Channel layer settings - disabled since using HTTP polling
-# CHANNEL_LAYERS = {
-#     "default": {
-#         "BACKEND": "channels_redis.core.RedisChannelLayer",
-#         "CONFIG": {
-#             "hosts": [REDIS_URL],
-#         },
-#     },
-# }
+# Channel layer. Consumers that use groups (ws/stream/) need one to exist at all,
+# otherwise `self.channel_layer` is None and the socket closes on connect.
+#
+# The in-memory layer is per-process: it lets the socket work, but a separate
+# `manage.py run_live_stream` process cannot reach web-process subscribers.
+# Set REDIS_CHANNEL_LAYER=True (with redis running) for real cross-process streaming.
+if env.bool('REDIS_CHANNEL_LAYER', default=False):
+    CHANNEL_LAYERS = {
+        "default": {
+            "BACKEND": "channels_redis.core.RedisChannelLayer",
+            "CONFIG": {
+                "hosts": [env('REDIS_URL', default='redis://localhost:6379/0')],
+            },
+        },
+    }
+else:
+    CHANNEL_LAYERS = {
+        "default": {"BACKEND": "channels.layers.InMemoryChannelLayer"},
+    }
 
 # CORS settings
 CORS_ALLOWED_ORIGINS = [

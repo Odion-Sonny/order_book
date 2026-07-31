@@ -27,20 +27,31 @@ class AlpacaService:
         self.secret_key = os.getenv('ALPACA_API_SECRET')
         self.base_url = os.getenv('ALPACA_API_BASE_URL', 'https://paper-api.alpaca.markets')
         
-        if HAS_ALPACA_SDK:
-            self.trading_client = TradingClient(
-                api_key=self.api_key,
-                secret_key=self.secret_key,
-                paper=True  # Set to True for paper trading
+        # Without credentials the SDK raises on construction, which would break the
+        # import of every module that touches this service. Stay unconfigured
+        # instead; the methods below already fall back to mock data.
+        self.trading_client = None
+        self.data_client = None
+
+        if HAS_ALPACA_SDK and self.api_key and self.secret_key:
+            try:
+                self.trading_client = TradingClient(
+                    api_key=self.api_key,
+                    secret_key=self.secret_key,
+                    paper=True  # Set to True for paper trading
+                )
+
+                self.data_client = StockHistoricalDataClient(
+                    api_key=self.api_key,
+                    secret_key=self.secret_key
+                )
+            except Exception as e:
+                logger.error(f"Alpaca client init failed, using mock data: {e}")
+        elif HAS_ALPACA_SDK:
+            logger.warning(
+                "ALPACA_API_KEY / ALPACA_API_SECRET not set - serving mock quotes "
+                "and empty bars. Add them to trading_engine/.env for live data."
             )
-            
-            self.data_client = StockHistoricalDataClient(
-                api_key=self.api_key,
-                secret_key=self.secret_key
-            )
-        else:
-            self.trading_client = None
-            self.data_client = None
         
         self.stream = None
         

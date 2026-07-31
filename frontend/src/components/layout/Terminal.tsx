@@ -9,10 +9,12 @@ import { WatchlistSidebar } from '@/components/layout/WatchlistSidebar';
 import { OrderBookPanel } from '@/components/market/OrderBookPanel';
 import { TimeAndSales } from '@/components/market/TimeAndSales';
 import { CommandPalette } from '@/components/ui/CommandPalette';
+import { LoginModal } from '@/components/ui/LoginModal';
 import { ResizeHandle } from '@/components/ui/ResizeHandle';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useStream } from '@/hooks/useStream';
 import { clamp } from '@/lib/format';
+import { useAuthStore } from '@/store/authStore';
 import { log } from '@/store/logStore';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
@@ -53,6 +55,7 @@ export function Terminal() {
   /* Persisted layout is read on the client only — render after hydration. */
   useEffect(() => {
     setMounted(true);
+    useAuthStore.getState().hydrate();
     // First visit: size the columns so the chart occupies ~65% of the viewport.
     if (typeof window !== 'undefined' && !window.localStorage.getItem(LAYOUT_KEY)) {
       const vw = window.innerWidth;
@@ -242,6 +245,7 @@ export function Terminal() {
       </footer>
 
       <CommandPalette />
+      <LoginModal />
     </div>
   );
 }

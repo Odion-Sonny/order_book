@@ -90,7 +90,28 @@ export function toCandle(bar: Bar): Candle {
 export const api = {
   assets: () => request<unknown>('/assets/').then(list<Asset>),
 
-  marketData: () => request<unknown>('/assets/market_data/').then(list<MarketSnapshot>),
+  /**
+   * `market_data` is Alpaca-backed and returns zeroed prices when no credentials
+   * are configured. Fall back to the seeded values on `/assets/` so the terminal
+   * still shows meaningful numbers.
+   */
+  marketData: async (): Promise<MarketSnapshot[]> => {
+    const snapshots = list<MarketSnapshot>(await request<unknown>('/assets/market_data/'));
+    if (snapshots.some((s) => num(s.current_price) > 0)) return snapshots;
+
+    const assets = list<MarketSnapshot>(await request<unknown>('/assets/'));
+    const bySymbol = new Map(assets.map((a) => [a.ticker, a]));
+    return snapshots.map((snapshot) => {
+      const seeded = bySymbol.get(snapshot.ticker);
+      if (!seeded) return snapshot;
+      return {
+        ...snapshot,
+        current_price: num(seeded.current_price),
+        price_change: num(seeded.price_change),
+        price_change_percent: num(seeded.price_change_percent),
+      };
+    });
+  },
 
   chartData: async (ticker: string, timeframe: Timeframe, limit = 500): Promise<Candle[]> => {
     const data = await request<{ bars?: Bar[] }>(
