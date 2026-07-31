@@ -1,7 +1,7 @@
 #!/bin/bash
 
 # Trading Engine Quick Start Script
-# This script starts both the Django backend and React frontend
+# This script starts both the Django backend and Next.js frontend
 
 echo "========================================"
 echo "  Trading Engine - Quick Start"
@@ -57,8 +57,8 @@ echo ""
 # Wait for backend to start
 sleep 3
 
-# Start React frontend
-echo -e "${BLUE}[2/2] Starting React Frontend...${NC}"
+# Start Next.js frontend
+echo -e "${BLUE}[2/2] Starting Next.js Frontend...${NC}"
 cd "$FRONTEND_DIR"
 
 if [ ! -d "node_modules" ]; then
@@ -66,8 +66,8 @@ if [ ! -d "node_modules" ]; then
     npm install
 fi
 
-echo -e "${GREEN}Starting React development server on http://localhost:3000${NC}"
-npm start > /dev/null 2>&1 &
+echo -e "${GREEN}Starting Next.js development server on http://localhost:3000${NC}"
+npm run dev > /dev/null 2>&1 &
 FRONTEND_PID=$!
 echo -e "${GREEN}✓ Frontend started (PID: $FRONTEND_PID)${NC}"
 echo ""

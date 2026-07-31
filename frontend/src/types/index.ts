@@ -1,11 +1,52 @@
+/** Types mirroring the Django `order_book` API contract. */
+
+export type OrderSide = 'BUY' | 'SELL';
+export type OrderType = 'LIMIT' | 'MARKET' | 'STOP_LOSS';
+export type OrderStatus = 'PENDING' | 'FILLED' | 'CANCELLED' | 'REJECTED';
+
 export interface Asset {
-  id: string | number;
+  id: number;
   name: string;
   ticker: string;
-  description: string;
-  current_price?: string | number;
-  volume_24h?: string | number;
-  change_24h?: string | number;
+  description?: string;
+}
+
+/** Shape returned by `GET /api/assets/market_data/`. */
+export interface MarketSnapshot extends Asset {
+  current_price: number;
+  price_change: number;
+  price_change_percent: number;
+  bid_price: number;
+  ask_price: number;
+  bid_size: number;
+  ask_size: number;
+  chart_data?: Bar[];
+}
+
+/** Bar as returned by Alpaca through `assets/chart_data`. */
+export interface Bar {
+  t?: string;
+  timestamp?: string;
+  o?: number;
+  h?: number;
+  l?: number;
+  c?: number;
+  v?: number;
+  open?: number;
+  high?: number;
+  low?: number;
+  close?: number;
+  volume?: number;
+}
+
+/** Normalised candle used everywhere in the UI. */
+export interface Candle {
+  time: number; // unix seconds
+  open: number;
+  high: number;
+  low: number;
+  close: number;
+  volume: number;
 }
 
 export interface OrderBookLevel {
@@ -15,56 +56,93 @@ export interface OrderBookLevel {
 }
 
 export interface OrderBookData {
+  ticker: string;
   bids: OrderBookLevel[];
   asks: OrderBookLevel[];
   last_price: number;
-  ticker: string;
+  market_data?: {
+    bid_price?: number;
+    ask_price?: number;
+    bid_size?: number;
+    ask_size?: number;
+  };
+}
+
+export interface Order {
+  id: number;
+  asset: number | string;
+  asset_ticker?: string;
+  price: string | number;
+  size: string | number;
+  order_type: OrderType;
+  side: OrderSide;
+  status: OrderStatus;
+  created_at: string;
+  executed_at?: string | null;
 }
 
 export interface Trade {
-  id: string;
-  asset_ticker: string;
+  id: number;
+  asset?: number;
+  asset_ticker?: string;
+  ticker?: string;
   price: string | number;
-  quantity: string | number;
-  volume?: string | number;
-  side: 'BUY' | 'SELL';
-  type: string;
-  timestamp: string;
-}
-
-export interface ChartData {
-  time: string | number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume?: number;
+  size: string | number;
+  executed_at: string;
+  side?: OrderSide;
 }
 
 export interface Portfolio {
   id: number;
-  user: number;
   cash_balance: string | number;
   buying_power: string | number;
-  total_value: string | number;
+  total_value?: string | number;
+  pnl?: string | number;
 }
 
 export interface Position {
   id: number;
-  asset: Asset;
+  asset?: number;
+  asset_ticker?: string;
+  ticker?: string;
   quantity: string | number;
-  average_price: string | number;
-  current_price?: string | number;
+  average_cost: string | number;
+  current_price: string | number;
   unrealized_pnl?: string | number;
+  pnl_percent?: string | number;
 }
 
-export interface Order {
-  id?: string | number;
-  asset_ticker: string;
-  side: 'BUY' | 'SELL';
-  order_type: 'MARKET' | 'LIMIT';
-  price?: number;
-  size: number;
-  status?: string;
-  created_at?: string;
+export interface BacktestRun {
+  id: number;
+  name: string;
+  status: 'PENDING' | 'RUNNING' | 'COMPLETED' | 'FAILED';
+  start_date: string;
+  end_date: string;
+  initial_capital: string | number;
+  created_at: string;
+  error_message?: string;
+}
+
+export interface BacktestResult {
+  total_trades: number;
+  winning_trades: number;
+  losing_trades: number;
+  total_return: string | number;
+  total_return_percent: string | number;
+  sharpe_ratio: string | number;
+  max_drawdown_percent: string | number;
+  win_rate: string | number;
+  profit_factor: string | number;
+  equity_curve: Array<{ date?: string; value?: number } | number>;
+  trades_data: unknown[];
+}
+
+export type Timeframe = '1Min' | '5Min' | '15Min' | '1Hour' | '4Hour' | '1Day' | '1Week';
+
+export interface LogEntry {
+  id: string;
+  ts: number;
+  level: 'info' | 'warn' | 'error' | 'success';
+  source: string;
+  message: string;
 }

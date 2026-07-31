@@ -1,0 +1,140 @@
+@import 'tailwindcss';
+
+/* Terminal palette — dark is the default, light mirrors every token. */
+:root,
+:root[data-theme='dark'] {
+  --bg: #0c0e15;
+  --surface: #131722;
+  --surface-2: #1a1f2e;
+  --surface-3: #222839;
+  --border: #2a3040;
+  --border-strong: #39415a;
+  --text: #d6dae4;
+  --text-dim: #8b93a7;
+  --text-faint: #5d6577;
+  --accent: #2962ff;
+  --accent-soft: rgba(41, 98, 255, 0.16);
+  --up: #26a69a;
+  --down: #ef5350;
+  --warn: #f0b90b;
+  --bid-bar: rgba(38, 166, 154, 0.16);
+  --ask-bar: rgba(239, 83, 80, 0.16);
+}
+
+:root[data-theme='light'] {
+  --bg: #f3f4f7;
+  --surface: #ffffff;
+  --surface-2: #f7f8fa;
+  --surface-3: #eceef2;
+  --border: #dcdfe6;
+  --border-strong: #c2c7d2;
+  --text: #14181f;
+  --text-dim: #5b6472;
+  --text-faint: #8a93a2;
+  --accent: #2962ff;
+  --accent-soft: rgba(41, 98, 255, 0.1);
+  --up: #089981;
+  --down: #f23645;
+  --warn: #b8860b;
+  --bid-bar: rgba(8, 153, 129, 0.13);
+  --ask-bar: rgba(242, 54, 69, 0.13);
+}
+
+@theme inline {
+  --color-bg: var(--bg);
+  --color-surface: var(--surface);
+  --color-surface-2: var(--surface-2);
+  --color-surface-3: var(--surface-3);
+  --color-line: var(--border);
+  --color-line-strong: var(--border-strong);
+  --color-fg: var(--text);
+  --color-dim: var(--text-dim);
+  --color-faint: var(--text-faint);
+  --color-accent: var(--accent);
+  --color-accent-soft: var(--accent-soft);
+  --color-up: var(--up);
+  --color-down: var(--down);
+  --color-warn: var(--warn);
+
+  --font-mono: ui-monospace, 'SF Mono', 'JetBrains Mono', Menlo, Consolas, monospace;
+}
+
+html,
+body {
+  height: 100%;
+}
+
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family:
+    -apple-system, BlinkMacSystemFont, 'Segoe UI', Inter, Roboto, Helvetica, Arial, sans-serif;
+  font-size: 13px;
+  overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+/* Numeric columns line up only with tabular figures. */
+.tabular {
+  font-variant-numeric: tabular-nums;
+  font-family: var(--font-mono);
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: var(--border-strong);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: var(--text-faint);
+}
+
+/* Resize affordances */
+.resize-col {
+  cursor: col-resize;
+}
+.resize-row {
+  cursor: row-resize;
+}
+
+.no-select {
+  user-select: none;
+}
+
+@keyframes flash-up {
+  from {
+    background-color: rgba(38, 166, 154, 0.35);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+@keyframes flash-down {
+  from {
+    background-color: rgba(239, 83, 80, 0.35);
+  }
+  to {
+    background-color: transparent;
+  }
+}
+
+.flash-up {
+  animation: flash-up 0.6s ease-out;
+}
+.flash-down {
+  animation: flash-down 0.6s ease-out;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .flash-up,
+  .flash-down {
+    animation: none;
+  }
+}
