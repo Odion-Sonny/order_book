@@ -7,8 +7,9 @@ try:
     from alpaca.data.historical import StockHistoricalDataClient
     from alpaca.data.live import StockDataStream
     from alpaca.data.requests import StockLatestQuoteRequest, StockBarsRequest, StockTradesRequest, StockSnapshotRequest
-    from alpaca.data.timeframe import TimeFrame
+    from alpaca.data.timeframe import TimeFrame, TimeFrameUnit
     from alpaca.data.enums import DataFeed
+    from alpaca.common.enums import Sort
     from alpaca.trading.requests import GetOrdersRequest
     from alpaca.trading.enums import OrderStatus, QueryOrderStatus
     HAS_ALPACA_SDK = True
@@ -26,7 +27,10 @@ class AlpacaService:
         self.api_key = os.getenv('ALPACA_API_KEY')
         self.secret_key = os.getenv('ALPACA_API_SECRET')
         self.base_url = os.getenv('ALPACA_API_BASE_URL', 'https://paper-api.alpaca.markets')
-        
+        # Free Alpaca accounts only have IEX. Requesting SIP without a market-data
+        # subscription fails the whole request, so IEX is the safe default.
+        self.data_feed = os.getenv('ALPACA_DATA_FEED', 'iex').lower()
+
         # Without credentials the SDK raises on construction, which would break the
         # import of every module that touches this service. Stay unconfigured
         # instead; the methods below already fall back to mock data.
@@ -86,35 +90,87 @@ class AlpacaService:
                 }
             return result
     
-    def get_stock_bars(self, symbols: List[str], timeframe: str = '1Day', limit: int = 100) -> Dict[str, List[Dict]]:
-        """Get historical stock bars (OHLCV data)"""
+    # How much wall-clock time one bar of each timeframe covers, used to work out
+    # how far back to start when the caller only gives a bar count.
+    _TIMEFRAME_DAYS = {
+        '1Min': 1 / 390,
+        '5Min': 5 / 390,
+        '15Min': 15 / 390,
+        '1Hour': 1 / 7,
+        '4Hour': 4 / 7,
+        '1Day': 1,
+        '1Week': 7,
+        '1Month': 31,
+    }
+
+    def _timeframe(self, timeframe: str):
+        """Map a UI timeframe string onto an Alpaca TimeFrame."""
+        # The unit must be a TimeFrameUnit; passing the plain string 'Minute'
+        # blows up later inside the SDK when it reads unit.value.
+        return {
+            '1Min': TimeFrame.Minute,
+            '5Min': TimeFrame(5, TimeFrameUnit.Minute),
+            '15Min': TimeFrame(15, TimeFrameUnit.Minute),
+            '1Hour': TimeFrame.Hour,
+            '4Hour': TimeFrame(4, TimeFrameUnit.Hour),
+            '1Day': TimeFrame.Day,
+            '1Week': TimeFrame.Week,
+            '1Month': TimeFrame.Month,
+        }.get(timeframe, TimeFrame.Day)
+
+    def get_stock_bars(self, symbols: List[str], timeframe: str = '1Day', limit: int = 100,
+                       start=None, end=None) -> Dict[str, List[Dict]]:
+        """
+        Get historical stock bars (OHLCV data).
+
+        `start` / `end` accept dates, datetimes or ISO strings. When `start` is
+        omitted it is derived from `limit` and the timeframe, so requesting 260
+        weekly bars really does reach five years back.
+        """
+        if not self.data_client:
+            raise RuntimeError(
+                "Alpaca credentials are not configured - set ALPACA_API_KEY and "
+                "ALPACA_API_SECRET in trading_engine/.env"
+            )
+
         try:
-            timeframe_map = {
-                '1Min': TimeFrame.Minute,
-                '5Min': TimeFrame(5, 'Minute'),
-                '15Min': TimeFrame(15, 'Minute'),
-                '1Hour': TimeFrame.Hour,
-                '1Day': TimeFrame.Day
-            }
-            
-            tf = timeframe_map.get(timeframe, TimeFrame.Day)
+            tf = self._timeframe(timeframe)
+
+            if isinstance(start, str):
+                start = datetime.fromisoformat(start)
+            if isinstance(end, str):
+                end = datetime.fromisoformat(end)
+
             result = {}
-            
+            errors = {}
+
             # Process each symbol individually to avoid API issues
             for symbol in symbols:
                 try:
-                    # Calculate start date dynamically based on limit
-                    # Add 50% buffer to account for weekends/holidays
-                    days_to_fetch = int(limit * 1.5)
-                    start_date = datetime.now() - timedelta(days=days_to_fetch)
+                    if start is None:
+                        # Span the requested number of bars, with a 60% buffer for
+                        # weekends and holidays.
+                        per_bar = self._TIMEFRAME_DAYS.get(timeframe, 1)
+                        days_to_fetch = max(int(limit * per_bar * 1.6), 2)
+                        bar_start = datetime.now() - timedelta(days=days_to_fetch)
+                    else:
+                        bar_start = start
+
+                    # Alpaca applies `limit` from the start of the window, so an
+                    # ascending request returns the OLDEST bars and the chart ends
+                    # in the past. Ask for the newest first, then flip to ascending.
+                    newest_first = start is None
 
                     request = StockBarsRequest(
                         symbol_or_symbols=[symbol],  # Single symbol at a time
                         timeframe=tf,
-                        start=start_date,
-                        limit=limit
+                        start=bar_start,
+                        end=end,
+                        limit=limit,
+                        feed=DataFeed.SIP if self.data_feed == 'sip' else DataFeed.IEX,
+                        sort=Sort.DESC if newest_first else Sort.ASC,
                     )
-                    
+
                     bars = self.data_client.get_stock_bars(request)
                     result[symbol] = []
 
@@ -135,6 +191,8 @@ class AlpacaService:
                         bar_list = getattr(bars.data, symbol)
 
                     if bar_list:
+                        if newest_first:
+                            bar_list = list(reversed(bar_list))
                         for bar in bar_list:
                             result[symbol].append({
                                 'timestamp': bar.timestamp.isoformat(),
@@ -151,14 +209,25 @@ class AlpacaService:
                         result[symbol] = []
                         
                 except Exception as e:
-                    logger.error(f"Error getting bars for {symbol}: {e}")
+                    # Swallowing this used to surface as a bare "no bars", hiding
+                    # subscription and credential errors. Keep the reason.
+                    logger.error(f"Error getting bars for {symbol} (feed={self.data_feed}): {e}")
+                    errors[symbol] = str(e)
                     result[symbol] = []
-                    
+
+            if errors and not any(result.values()):
+                raise RuntimeError(
+                    f"Alpaca returned no bars ({self.data_feed} feed): "
+                    f"{next(iter(errors.values()))}"
+                )
+
             return result
+        except RuntimeError:
+            raise  # already a diagnosed failure; let the caller report it
         except Exception as e:
             logger.error(f"Error getting stock bars: {e}")
             return {symbol: [] for symbol in symbols}
-    
+
     def get_account_info(self):
         """Get account information"""
         try:

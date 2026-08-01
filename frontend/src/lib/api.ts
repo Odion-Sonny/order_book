@@ -57,7 +57,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
     } catch {
       body = await res.text().catch(() => undefined);
     }
-    throw new ApiError(`${init.method ?? 'GET'} ${path} failed (${res.status})`, res.status, body);
+
+    // Prefer the server's own explanation ("Alpaca credentials are not
+    // configured…") over a bare status code.
+    const detail =
+      body && typeof body === 'object'
+        ? ((body as { error?: string; detail?: string }).error ??
+          (body as { detail?: string }).detail)
+        : typeof body === 'string' && body.length < 300
+          ? body
+          : undefined;
+
+    throw new ApiError(
+      detail ?? `${init.method ?? 'GET'} ${path} failed (${res.status})`,
+      res.status,
+      body,
+    );
   }
 
   if (res.status === 204) return undefined as T;
