@@ -1,11 +1,12 @@
 """
 Order book construction shared by the REST endpoint and the WebSocket consumer.
 
-Both used to build the ladder themselves, and they disagreed: the REST view merged
-local orders with synthetic Alpaca depth, while the consumer showed synthetic depth
-only when there were no local orders at all. Both also required a positive ask,
-so any symbol quoting one-sided (common on IEX outside regular hours) rendered an
-empty book.
+Both used to build the ladder themselves, and they disagreed about how to merge
+resting local orders with venue data.
+
+Everything here is real: resting orders from the matching engine, and top-of-book
+from the quote feed. Alpaca's free IEX feed publishes level 1 only, so the market
+side is at most one bid and one ask. Depth beyond that is not invented.
 """
 
 import logging
@@ -20,7 +21,7 @@ from .alpaca_service import alpaca_service
 
 logger = logging.getLogger(__name__)
 
-# Most recent traded price per symbol, written by the live/simulated stream.
+# Most recent traded price per symbol, written by the live market stream.
 # Quotes stand still when the market is closed, so a tick that just crossed the
 # wire is a better mark than a stale quote.
 TICK_TTL_SECONDS = 90
@@ -70,13 +71,6 @@ def latest_tick(ticker: str) -> float:
     except Exception:
         return 0.0
 
-# Synthetic ladder shape when the venue does not publish usable depth.
-SYNTHETIC_LEVELS = 10
-# Half-spread used when the feed gives us only one side, in basis points.
-FALLBACK_HALF_SPREAD_BPS = 5
-# Each synthetic level steps this far from the mid, in basis points.
-LEVEL_STEP_BPS = 4
-BASE_LEVEL_SIZE = 100
 
 
 def ensure_asset(ticker: str) -> Asset | None:
@@ -154,37 +148,24 @@ def reference_price(ticker: str, quote: dict | None = None, order_book: OrderBoo
     return 0.0
 
 
-def _synthetic_depth(mid: float, quote: dict) -> tuple[list, list]:
-    """Generate a plausible ladder around `mid` when real depth is unavailable."""
-    if mid <= 0:
-        return [], []
-
-    bid = float(quote.get('bid_price') or 0)
-    ask = float(quote.get('ask_price') or 0)
-
-    # Use the real spread when the feed gives us both sides; otherwise assume a
-    # tight one rather than refusing to draw a book at all.
-    if bid > 0 and ask > bid:
-        half_spread = (ask - bid) / 2
-    else:
-        half_spread = mid * FALLBACK_HALF_SPREAD_BPS / 10_000
-
-    bid_size = float(quote.get('bid_size') or 0) or BASE_LEVEL_SIZE
-    ask_size = float(quote.get('ask_size') or 0) or BASE_LEVEL_SIZE
-    step = mid * LEVEL_STEP_BPS / 10_000
-
+def _market_depth(quote: dict) -> tuple[list, list]:
+    """
+    Real venue depth, which on Alpaca's free IEX feed is top-of-book only:
+    one bid and one ask, exactly as published. Nothing is inferred — a side the
+    feed does not quote is simply absent.
+    """
     bids, asks = [], []
-    for i in range(SYNTHETIC_LEVELS):
-        bids.append({
-            'price': round(mid - half_spread - step * i, 2),
-            'size': round(bid_size * (1 + i * 0.2)),
-            'source': 'market',
-        })
-        asks.append({
-            'price': round(mid + half_spread + step * i, 2),
-            'size': round(ask_size * (1 + i * 0.2)),
-            'source': 'market',
-        })
+
+    bid_price = float(quote.get('bid_price') or 0)
+    bid_size = float(quote.get('bid_size') or 0)
+    if bid_price > 0 and bid_size > 0:
+        bids.append({'price': round(bid_price, 2), 'size': bid_size, 'source': 'market'})
+
+    ask_price = float(quote.get('ask_price') or 0)
+    ask_size = float(quote.get('ask_size') or 0)
+    if ask_price > 0 and ask_size > 0:
+        asks.append({'price': round(ask_price, 2), 'size': ask_size, 'source': 'market'})
+
     return bids, asks
 
 
@@ -216,10 +197,12 @@ def _cumulative(levels: list) -> list:
 
 def build_order_book(ticker: str, levels: int = 10) -> dict:
     """
-    Merge resting local orders with venue depth into a single ladder.
+    Merge resting local orders with real venue depth into a single ladder.
 
-    Always returns both sides when a price is known, so a one-sided or missing
-    quote no longer produces an empty book.
+    Both sources are genuine: resting orders come from the matching engine and
+    market levels straight from the quote feed. When the venue publishes no
+    usable quote — which is normal outside market hours — that side is empty
+    rather than filled in with invented levels.
     """
     ticker = ticker.upper()
     asset = Asset.objects.get(ticker=ticker)
@@ -229,7 +212,7 @@ def build_order_book(ticker: str, levels: int = 10) -> dict:
     mid = reference_price(ticker, quote=quote, order_book=order_book)
 
     local_bids, local_asks = _local_orders(asset)
-    market_bids, market_asks = _synthetic_depth(mid, quote)
+    market_bids, market_asks = _market_depth(quote)
 
     all_bids = sorted(local_bids + market_bids, key=lambda x: x['price'], reverse=True)
     all_asks = sorted(local_asks + market_asks, key=lambda x: x['price'])

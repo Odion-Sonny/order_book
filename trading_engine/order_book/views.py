@@ -7,13 +7,14 @@ from .models import Asset, Order, OrderBook, Trade
 from .serializers import AssetSerializer, OrderSerializer, OrderBookSerializer
 from .services.matching_engine import MatchingEngine
 from .services.alpaca_service import alpaca_service
-from .services.book_builder import build_order_book, ensure_asset, reference_price
+from .services.book_builder import build_order_book, ensure_asset
 from .services.risk_management import RiskManagementService
 from .services.audit_logger import AuditLogger
 from django.db.models import Min, Max, Sum
-import random
+import logging
 from decimal import Decimal
-from django.utils import timezone
+
+logger = logging.getLogger(__name__)
 
 class AssetViewSet(viewsets.ModelViewSet):
     queryset = Asset.objects.all()
@@ -395,65 +396,11 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
             total_size=Sum('size')
         ).order_by('price')[:depth_levels]
         
-        # If no orders exist, generate realistic market depth from Alpaca quotes
+        # With no resting orders, fall through to the shared builder so this
+        # endpoint returns the same real top-of-book the rest of the app uses.
         if not bids and not asks:
-            ticker = order_book.asset.ticker
-            quotes = alpaca_service.get_latest_quotes([ticker])
-            
-            if ticker in quotes and quotes[ticker]['ask_price'] > 0:
-                bid_price = quotes[ticker]['bid_price']
-                ask_price = quotes[ticker]['ask_price']
-                spread = ask_price - bid_price
-                mid_price = (bid_price + ask_price) / 2
-                
-                # Generate realistic order book depth around market price
-                bid_list = []
-                ask_list = []
-                
-                # Create levels of bids below market price
-                for i in range(depth_levels):
-                    level_price = bid_price - (spread * 0.1 * i)
-                    base_size = random.randint(50, 500)
-                    size_multiplier = 1 + (i * 0.3)
-                    level_size = int(base_size * size_multiplier)
-                    running_total = sum(bid['size'] for bid in bid_list) + level_size
-                    
-                    bid_list.append({
-                        'price': round(level_price, 2),
-                        'size': level_size,
-                        'total': round(running_total * level_price, 2)
-                    })
-                
-                # Create levels of asks above market price  
-                for i in range(depth_levels):
-                    level_price = ask_price + (spread * 0.1 * i)
-                    base_size = random.randint(50, 500)
-                    size_multiplier = 1 + (i * 0.3)
-                    level_size = int(base_size * size_multiplier)
-                    running_total = sum(ask['size'] for ask in ask_list) + level_size
-                    
-                    ask_list.insert(0, {
-                        'price': round(level_price, 2),
-                        'size': level_size,
-                        'total': round(running_total * level_price, 2)
-                    })
-                
-                return Response({
-                    'bids': bid_list,
-                    'asks': ask_list,
-                    'last_price': mid_price,
-                    'ticker': ticker,
-                    'market_data': quotes.get(ticker, {})
-                })
-            else:
-                return Response({
-                    'bids': [],
-                    'asks': [],
-                    'last_price': float(order_book.last_price) if order_book.last_price else 0,
-                    'ticker': ticker,
-                    'market_data': quotes.get(ticker, {})
-                })
-        
+            return Response(build_order_book(order_book.asset.ticker, levels=depth_levels))
+
         # Calculate cumulative totals for real orders
         bid_list = []
         running_bid_total = 0
@@ -483,6 +430,18 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
         })
 
 @api_view(['GET'])
+def market_clock(request):
+    """
+    Venue trading calendar: is the market open, and when does it next open/close.
+    Lets the UI label a quiet feed as 'market closed' rather than looking broken.
+    """
+    clock = alpaca_service.get_clock()
+    if not clock:
+        return Response({'is_open': None, 'error': 'Market clock unavailable'}, status=503)
+    return Response(clock)
+
+
+@api_view(['GET'])
 def trades_list(request):
     """Get real trade executions from local Order Book with Alpaca fallback"""
     try:
@@ -499,14 +458,9 @@ def trades_list(request):
         from .serializers import TradeSerializer
         local_trades_data = TradeSerializer(local_trades, many=True).data
         
-        # If we have enough local trades, return them directly
-        # This ensures the user sees their actual system working
+        # Local fills win: these are this engine's own executions. The Trade
+        # model calls it executed_at; the tape expects timestamp.
         if len(local_trades_data) > 0:
-            # Transform to common format if needed, but Frontend likely expects standard Trade fields
-            # The Matchign Engine Trade model has: price, size, asset, executed_at
-            # The previous simulated format had: price, size, asset, timestamp
-            # We need to map 'executed_at' to 'timestamp' for consistency if frontend expects it
-            # Let's clean up the response
             formatted_trades = []
             for t in local_trades_data:
                 formatted_trades.append({
@@ -521,64 +475,22 @@ def trades_list(request):
                 })
             return Response(formatted_trades)
 
-        # 2. Fallback: Alpaca/Simulation (Only if no local trades exist)
-        # This keeps the chart alive for demo purposes before any user interaction
+        # 2. No local fills yet: fall back to the venue's real prints.
         assets = Asset.objects.all()
         if ticker:
             assets = assets.filter(ticker=ticker)
-            
+
         symbols = [asset.ticker for asset in assets]
 
-        # Try to get real trade data from Alpaca
         alpaca_trades = []
         if symbols:
             try:
                 alpaca_trades = alpaca_service.get_recent_trades(symbols, limit=min(limit, 20))
             except Exception as e:
-                print(f"Error getting Alpaca market trades: {e}")
+                logger.warning(f"Could not fetch trades from Alpaca: {e}")
 
-        if alpaca_trades:
-             return Response(alpaca_trades)
-
-        # 3. Final Fallback: Simulation
-        # ... (Existing simulation logic)
-        if assets:
-            sample_trades = []
-            base_time = timezone.now()
-            # Price each symbol once; reference_price falls back through the
-            # tick cache, quote, last trade and stored price, so a closed market
-            # no longer prints everything at a hardcoded 100.
-            price_by_ticker = {a.ticker: reference_price(a.ticker) for a in assets}
-
-            for i in range(min(limit, 15)):
-                asset = random.choice(assets)
-                base_price = price_by_ticker.get(asset.ticker) or 0
-                if base_price <= 0:
-                    continue
-
-                price_variation = random.uniform(-0.02, 0.02)
-                trade_price = base_price * (1 + price_variation)
-                seconds_back = sum([random.randint(15, 45) for _ in range(i + 1)])
-                trade_time = base_time - timezone.timedelta(seconds=seconds_back)
-
-                side = random.choice(['BUY', 'SELL'])
-                size = random.randint(10, 500)
-                volume = trade_price * size
-
-                sample_trades.append({
-                    'id': f"sim_{i+1}_{int(trade_time.timestamp())}",
-                    'asset': asset.ticker,
-                    'price': f"{trade_price:.2f}",
-                    'size': str(size),
-                    'timestamp': trade_time.isoformat(),
-                    'side': side,
-                    'volume': f"{volume:.2f}"
-                })
-            
-            sample_trades.sort(key=lambda x: x['timestamp'], reverse=True)
-            return Response(sample_trades)
-            
-        return Response([])
+        # An empty tape is the correct answer when the market has not printed.
+        return Response(alpaca_trades)
 
     except Exception as e:
         return Response({'error': f'Failed to fetch trades: {str(e)}'}, status=500)

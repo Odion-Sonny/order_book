@@ -126,7 +126,7 @@ export function OrderBookPanel() {
   return (
     <Panel
       title="Order Book"
-      subtitle={`L2 · ${symbol}`}
+      subtitle={`L1 · ${symbol}`}
       maximized={maximized === 'right'}
       onMaximize={() => toggleMaximized('right')}
       bodyClassName="flex flex-col"
@@ -140,6 +140,11 @@ export function OrderBookPanel() {
       <div className="min-h-0 flex-1 overflow-y-auto">
         {error && !book && (
           <p className="px-3 py-6 text-center text-[11px] text-faint">{error}</p>
+        )}
+        {book && asks.length === 0 && bids.length === 0 && (
+          <p className="px-3 py-6 text-center text-[11px] text-faint">
+            No quotes. The venue publishes none while the market is closed.
+          </p>
         )}
         <Ladder levels={asks} side="ask" maxSize={maxSize} />
 

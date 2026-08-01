@@ -88,7 +88,7 @@ export function PositionsPanel() {
                 <tr>
                   <td colSpan={7} className="px-2 py-8 text-center text-faint">
                     {authenticated
-                      ? 'No open positions. Submit a simulated order from the Portfolio tab.'
+                      ? 'No open positions. Submit a paper order from the Portfolio tab.'
                       : 'Sign in to see your positions.'}
                   </td>
                 </tr>

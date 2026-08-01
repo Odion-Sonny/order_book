@@ -30,6 +30,7 @@ import {
   useSymbolStore,
   type ChartType,
 } from '@/store/symbolStore';
+import { MarketStatusBadge } from './MarketStatusBadge';
 import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
 import { useAuthStore } from '@/store/authStore';
 import type { StreamStatus } from '@/lib/ws';
@@ -74,13 +75,7 @@ function IconToggle({
   );
 }
 
-export function TopBar({
-  streamStatus,
-  feedSource,
-}: {
-  streamStatus: StreamStatus;
-  feedSource: 'live' | 'sim' | null;
-}) {
+export function TopBar({ streamStatus }: { streamStatus: StreamStatus }) {
   const layout = useLayoutStore();
   const {
     symbol,
@@ -252,20 +247,7 @@ export function TopBar({
           }`}
         />
         <span className="text-[10px] uppercase tracking-wide text-faint">{streamStatus}</span>
-        {feedSource && (
-          <span
-            title={
-              feedSource === 'sim'
-                ? 'Simulated ticks - the market is closed'
-                : 'Live market data'
-            }
-            className={`rounded px-1 text-[9px] font-semibold uppercase ${
-              feedSource === 'sim' ? 'bg-warn/20 text-warn' : 'bg-up/20 text-up'
-            }`}
-          >
-            {feedSource}
-          </span>
-        )}
+        <MarketStatusBadge />
       </div>
 
       <div className="relative">

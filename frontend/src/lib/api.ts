@@ -138,6 +138,14 @@ export const api = {
       .sort((a, b) => a.time - b.time);
   },
 
+  /** Venue trading calendar, for the market open/closed badge. */
+  marketClock: () =>
+    request<{
+      is_open?: boolean | null;
+      next_open?: string | null;
+      next_close?: string | null;
+    }>('/market-clock/'),
+
   orderBook: (ticker: string, levels = 12) =>
     request<OrderBookData>(
       `/orderbooks/by_ticker/?ticker=${encodeURIComponent(ticker)}&levels=${levels}`,

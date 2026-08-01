@@ -18,15 +18,18 @@ Backend must be running for data:
 cd trading_engine
 daphne -b 127.0.0.1 -p 8000 trading_engine.asgi:application   # REST + WebSockets
 python manage.py run_live_stream          # Alpaca -> ws/stream/, during market hours
-python manage.py simulate_market --rate 6 # synthetic ticks when the market is closed
 ```
 
 Use `daphne`, not `runserver`: the WebSocket routes need ASGI.
 
-`simulate_market` publishes on the same channel and message shape as the live stream, so
-the frontend has one code path either way. Every simulated payload carries
-`source: "sim"` and the top bar shows a **SIM** badge, so nothing is passed off as real
-market data.
+Every price in the terminal is real. There is no simulator and no mock feed: quotes,
+bars and prints come from Alpaca, and the order book merges those with orders resting
+in this engine's own matching book. Alpaca's free IEX feed is top-of-book only, so the
+market side of the ladder is one bid and one ask — depth beyond that is not invented.
+
+Outside market hours the venue publishes little or nothing, so the tape empties and the
+book thins out. The top bar carries a **MARKET CLOSED** badge (fed by `/api/market-clock/`)
+so a quiet feed is never mistaken for a broken one.
 
 ### Drawing tools
 

@@ -24,7 +24,13 @@ from rest_framework_simplejwt.views import (
 )
 from rest_framework import permissions
 
-from order_book.views import AssetViewSet, OrderViewSet, OrderBookViewSet, trades_list
+from order_book.views import (
+    AssetViewSet,
+    OrderViewSet,
+    OrderBookViewSet,
+    market_clock,
+    trades_list,
+)
 from order_book.views_extended import (
     PortfolioViewSet,
     PositionViewSet,
@@ -82,6 +88,7 @@ urlpatterns = [
     # API endpoints
     path('api/', include(router.urls)),
     path('api/trades-list/', trades_list, name='trades-list'),
+    path('api/market-clock/', market_clock, name='market-clock'),
 
     # JWT Authentication
     path('api/auth/token/', TokenObtainPairView.as_view(), name='token_obtain_pair'),

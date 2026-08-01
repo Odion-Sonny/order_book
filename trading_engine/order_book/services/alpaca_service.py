@@ -33,7 +33,7 @@ class AlpacaService:
 
         # Without credentials the SDK raises on construction, which would break the
         # import of every module that touches this service. Stay unconfigured
-        # instead; the methods below already fall back to mock data.
+        # instead; callers then get empty results rather than invented ones.
         self.trading_client = None
         self.data_client = None
 
@@ -50,11 +50,11 @@ class AlpacaService:
                     secret_key=self.secret_key
                 )
             except Exception as e:
-                logger.error(f"Alpaca client init failed, using mock data: {e}")
+                logger.error(f"Alpaca client init failed: {e}")
         elif HAS_ALPACA_SDK:
             logger.warning(
-                "ALPACA_API_KEY / ALPACA_API_SECRET not set - serving mock quotes "
-                "and empty bars. Add them to trading_engine/.env for live data."
+                "ALPACA_API_KEY / ALPACA_API_SECRET not set - no market data will be "
+                "served. Add them to trading_engine/.env for live data."
             )
         
         self.stream = None
@@ -76,19 +76,11 @@ class AlpacaService:
                 }
             return result
         except Exception as e:
+            # No invented prices: callers must be able to tell "no quote" from
+            # a real one, and a made-up mid would silently poison the book,
+            # the tape and every position's mark.
             logger.error(f"Error getting latest quotes: {e}")
-            mock_prices = {'AAPL': 185.50, 'GOOGL': 142.20, 'MSFT': 415.30, 'TSLA': 248.80, 'AMZN': 178.10}
-            result = {}
-            for s in symbols:
-                base = mock_prices.get(s, 100.0)
-                result[s] = {
-                    'bid_price': round(base - 0.05, 2),
-                    'ask_price': round(base + 0.05, 2),
-                    'bid_size': 100,
-                    'ask_size': 100,
-                    'timestamp': timezone.now().isoformat()
-                }
-            return result
+            return {}
     
     # How much wall-clock time one bar of each timeframe covers, used to work out
     # how far back to start when the caller only gives a bar count.
@@ -247,11 +239,11 @@ class AlpacaService:
     
     async def setup_live_stream(self, symbols: List[str], handlers: Dict[str, Any]):
         """Setup live data stream for given symbols"""
-        if not HAS_ALPACA_SDK:
-            logger.info("Alpaca SDK not initialized; starting simulated tick generator.")
-            self._sim_handlers = handlers
-            self._sim_symbols = symbols
-            return
+        if not HAS_ALPACA_SDK or not (self.api_key and self.secret_key):
+            raise RuntimeError(
+                'Alpaca credentials or SDK missing - cannot open a live market stream. '
+                'Set ALPACA_API_KEY / ALPACA_API_SECRET in trading_engine/.env.'
+            )
 
         if not self.stream:
             self.stream = StockDataStream(
@@ -274,30 +266,30 @@ class AlpacaService:
     
     async def start_stream(self):
         """Start the live data stream"""
-        if HAS_ALPACA_SDK and self.stream:
-            await self.stream.run()
-        elif hasattr(self, '_sim_handlers'):
-            # Simulated live tick generator
-            import random
-            bar_handler = self._sim_handlers.get('bar')
-            while True:
-                await asyncio.sleep(2)
-                if bar_handler:
-                    for sym in getattr(self, '_sim_symbols', ['AAPL']):
-                        base = 185.0 if sym == 'AAPL' else 250.0
-                        price = round(base + random.uniform(-1.5, 1.5), 2)
-                        class SimBar:
-                            pass
-                        b = SimBar()
-                        b.symbol = sym
-                        b.open = price - 0.2
-                        b.high = price + 0.5
-                        b.low = price - 0.5
-                        b.close = price
-                        b.volume = random.randint(100, 5000)
-                        b.timestamp = timezone.now()
-                        await bar_handler(b)
-    
+        if not self.stream:
+            raise RuntimeError('No market stream configured; call setup_live_stream first.')
+        await self.stream.run()
+
+    def get_clock(self) -> Dict[str, Any]:
+        """
+        Venue trading clock. Drives the market-open/closed badge, so the UI can
+        say the market is shut instead of implying a dead feed is a broken one.
+        """
+        if not self.trading_client:
+            return {}
+        try:
+            clock = self.trading_client.get_clock()
+            return {
+                'timestamp': clock.timestamp.isoformat() if clock.timestamp else None,
+                'is_open': bool(clock.is_open),
+                'next_open': clock.next_open.isoformat() if clock.next_open else None,
+                'next_close': clock.next_close.isoformat() if clock.next_close else None,
+            }
+        except Exception as e:
+            logger.error(f"Error getting market clock: {e}")
+            return {}
+
+
     def stop_stream(self):
         """Stop the live data stream"""
         if self.stream:

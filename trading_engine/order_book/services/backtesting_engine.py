@@ -88,39 +88,9 @@ class BacktestEngine:
             return pd.DataFrame()
 
         except Exception as e:
-            print(f"Error fetching historical data: {e}")
-            # Return simulated data for demonstration
-            return self._generate_simulated_data()
-
-    def _generate_simulated_data(self):
-        """Generate simulated historical data for testing"""
-        dates = pd.date_range(
-            start=self.backtest_run.start_date,
-            end=self.backtest_run.end_date,
-            freq='D'
-        )
-
-        symbols = ['AAPL', 'MSFT', 'GOOGL']
-        data = []
-
-        for symbol in symbols:
-            base_price = 100
-            for date in dates:
-                # Simulate price movement
-                price_change = np.random.normal(0, 2)
-                base_price += price_change
-
-                data.append({
-                    'timestamp': date,
-                    'symbol': symbol,
-                    'open': base_price,
-                    'high': base_price + abs(np.random.normal(0, 1)),
-                    'low': base_price - abs(np.random.normal(0, 1)),
-                    'close': base_price,
-                    'volume': np.random.randint(1000000, 10000000)
-                })
-
-        return pd.DataFrame(data)
+            # A backtest on invented prices is worse than no backtest: it reads
+            # as a real result. Fail loudly instead.
+            raise RuntimeError(f"Could not load historical data for this backtest: {e}") from e
 
     def _execute_strategy(self, data):
         """Execute the trading strategy defined in strategy_code using RestrictedPython"""

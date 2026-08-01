@@ -97,8 +97,7 @@ export function TimeAndSales() {
         </AnimatePresence>
         {rows.length === 0 && (
           <li className="px-3 py-6 text-center text-[11px] text-faint">
-            Waiting for prints — start the stream with
-            <code className="mx-1 rounded bg-surface-2 px-1">manage.py run_live_stream</code>
+            No prints. The tape fills from real executions while the market is open.
           </li>
         )}
       </ul>

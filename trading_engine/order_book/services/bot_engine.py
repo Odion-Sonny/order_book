@@ -17,6 +17,26 @@ class LiveBotEngine:
         # In-memory storage for real-time bars
         self.market_data = pd.DataFrame(columns=['symbol', 'open', 'high', 'low', 'close', 'volume', 'timestamp'])
         
+    @sync_to_async
+    def _portfolio_context(self):
+        """
+        The bot's owner's actual cash and open positions, straight from the DB.
+        Returns (0.0, {}) when the account has no portfolio yet.
+        """
+        portfolio = Portfolio.objects.filter(user=self.bot.user).first()
+        if not portfolio:
+            return 0.0, {}
+
+        positions = {
+            position.asset.ticker: {
+                'quantity': float(position.quantity),
+                'average_cost': float(position.average_cost),
+                'current_price': float(position.current_price),
+            }
+            for position in portfolio.positions.select_related('asset')
+        }
+        return float(portfolio.cash_balance), positions
+
     async def initialize(self):
         self.bot = await sync_to_async(LiveBot.objects.get)(id=self.bot_id)
         
@@ -54,10 +74,11 @@ class LiveBotEngine:
         new_row = pd.DataFrame([tick_data])
         self.market_data = pd.concat([self.market_data, new_row], ignore_index=True)
         
-        # Provide portfolio context (mocked for now, needs DB fetch)
-        cash = 100000.00
-        positions = {}
-        
+        # Real portfolio context: a strategy told it holds a fictional $100k
+        # would size every order against a balance that does not exist.
+        cash, positions = await self._portfolio_context()
+
+
         def buy(symbol, qty):
             print(f"[Bot {self.bot_id}] BUY {qty} {symbol}")
             # Real implementation would create an Order via Alpaca/DB

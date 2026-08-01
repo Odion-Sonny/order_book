@@ -29,3 +29,4 @@ alpaca-mcp-server/
 !Readme.md
 !docs/*.md
 .DS_Store
+docs/FRONTEND.md
