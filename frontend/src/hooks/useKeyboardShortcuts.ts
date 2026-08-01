@@ -1,8 +1,20 @@
 'use client';
 
 import { useEffect } from 'react';
+import { useDrawingStore, type ToolId } from '@/store/drawingStore';
 import { BOTTOM_TABS, useLayoutStore } from '@/store/layoutStore';
 import { TIMEFRAMES, useSymbolStore } from '@/store/symbolStore';
+
+/** Single-key drawing tool bindings, in the spirit of TradingView's. */
+const DRAWING_KEYS: Record<string, ToolId> = {
+  t: 'trendline',
+  h: 'horizontal',
+  v: 'vertical',
+  r: 'rectangle',
+  m: 'measure',
+  a: 'ray',
+  n: 'text',
+};
 
 export const SHORTCUTS: Array<{ keys: string; action: string }> = [
   { keys: 'Ctrl K  /  /', action: 'Symbol search' },
@@ -12,6 +24,10 @@ export const SHORTCUTS: Array<{ keys: string; action: string }> = [
   { keys: 'Alt 1-5', action: 'Bottom dock tabs' },
   { keys: 'Shift 1-7', action: 'Timeframe' },
   { keys: 'F', action: 'Maximize chart' },
+  { keys: 'T / H / R', action: 'Trend line / horizontal / rectangle' },
+  { keys: 'M', action: 'Measure move' },
+  { keys: 'Alt F', action: 'Fibonacci retracement' },
+  { keys: 'Del', action: 'Delete selected drawing' },
   { keys: 'Ctrl Shift L', action: 'Toggle theme' },
   { keys: 'Ctrl Shift R', action: 'Reset layout' },
   { keys: 'Esc', action: 'Close overlay' },
@@ -106,6 +122,21 @@ export function useKeyboardShortcuts(): void {
       if (!mod && !event.altKey && event.key.toLowerCase() === 'f') {
         event.preventDefault();
         layout.toggleMaximized('chart');
+        return;
+      }
+
+      if (event.altKey && event.key.toLowerCase() === 'f') {
+        event.preventDefault();
+        useDrawingStore.getState().setTool('fib');
+        return;
+      }
+
+      if (!mod && !event.altKey) {
+        const tool = DRAWING_KEYS[event.key.toLowerCase()];
+        if (tool) {
+          event.preventDefault();
+          useDrawingStore.getState().setTool(tool);
+        }
       }
     };
 

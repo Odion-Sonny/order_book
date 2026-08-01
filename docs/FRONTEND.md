@@ -16,9 +16,25 @@ Backend must be running for data:
 
 ```bash
 cd trading_engine
-python manage.py runserver                 # REST + ASGI
-python manage.py run_live_stream           # Alpaca -> ws/stream/ (tape + bars)
+daphne -b 127.0.0.1 -p 8000 trading_engine.asgi:application   # REST + WebSockets
+python manage.py run_live_stream          # Alpaca -> ws/stream/, during market hours
+python manage.py simulate_market --rate 6 # synthetic ticks when the market is closed
 ```
+
+Use `daphne`, not `runserver`: the WebSocket routes need ASGI.
+
+`simulate_market` publishes on the same channel and message shape as the live stream, so
+the frontend has one code path either way. Every simulated payload carries
+`source: "sim"` and the top bar shows a **SIM** badge, so nothing is passed off as real
+market data.
+
+### Drawing tools
+
+The left rail on the chart has trend line, ray, horizontal and vertical lines, rectangle,
+Fibonacci retracement, measure, and text. Shortcuts: `T` trend, `H` horizontal, `V`
+vertical, `R` rectangle, `A` ray, `M` measure, `N` note, `Alt+F` fib. Drawings anchor to
+time and price so they stay put through pan and zoom, snap to candle OHLC when the magnet
+is on, and persist per symbol. `Esc` cancels, `Del` removes the selection.
 
 ### WSL note
 

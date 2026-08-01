@@ -9,6 +9,8 @@ empty book.
 """
 
 import logging
+import os
+import time
 from decimal import Decimal
 
 from django.db.models import Sum
@@ -17,6 +19,56 @@ from ..models import Asset, Order, OrderBook
 from .alpaca_service import alpaca_service
 
 logger = logging.getLogger(__name__)
+
+# Most recent traded price per symbol, written by the live/simulated stream.
+# Quotes stand still when the market is closed, so a tick that just crossed the
+# wire is a better mark than a stale quote.
+TICK_TTL_SECONDS = 90
+_tick_redis = None
+
+
+def _redis():
+    global _tick_redis
+    if _tick_redis is None:
+        try:
+            import redis as redis_lib
+
+            _tick_redis = redis_lib.Redis.from_url(
+                os.getenv('REDIS_URL', 'redis://localhost:6379/0'),
+                socket_timeout=1,
+                socket_connect_timeout=1,
+                decode_responses=True,
+            )
+        except Exception as e:
+            logger.debug(f"Tick cache unavailable: {e}")
+            _tick_redis = False
+    return _tick_redis or None
+
+
+def publish_tick(ticker: str, price: float) -> None:
+    """Record the latest traded price so the order book can mark against it."""
+    client = _redis()
+    if not client or price <= 0:
+        return
+    try:
+        client.setex(f'tick:{ticker.upper()}', TICK_TTL_SECONDS, f'{price}:{time.time()}')
+    except Exception as e:
+        logger.debug(f"Could not publish tick for {ticker}: {e}")
+
+
+def latest_tick(ticker: str) -> float:
+    """Most recent streamed price for a symbol, or 0 when there is none."""
+    client = _redis()
+    if not client:
+        return 0.0
+    try:
+        raw = client.get(f'tick:{ticker.upper()}')
+        if not raw:
+            return 0.0
+        price, _ = raw.split(':', 1)
+        return float(price)
+    except Exception:
+        return 0.0
 
 # Synthetic ladder shape when the venue does not publish usable depth.
 SYNTHETIC_LEVELS = 10
@@ -71,6 +123,11 @@ def reference_price(ticker: str, quote: dict | None = None, order_book: OrderBoo
     Best available price for a symbol, in order of preference:
     quote mid, single-sided quote, last trade, stored last price.
     """
+    # A tick that just arrived beats a quote that stopped moving hours ago.
+    tick = latest_tick(ticker)
+    if tick > 0:
+        return tick
+
     quote = quote if quote is not None else alpaca_service.get_latest_quotes([ticker]).get(ticker, {})
 
     bid = float(quote.get('bid_price') or 0)

@@ -13,9 +13,12 @@ import {
   type UTCTimestamp,
 } from 'lightweight-charts';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { DrawingCanvas } from './DrawingCanvas';
+import { DrawingToolbar } from './DrawingToolbar';
 import { api } from '@/lib/api';
 import { compact, price } from '@/lib/format';
 import {
+  INDICATOR_LABELS,
   PANE_INDICATORS,
   bollinger,
   ema,
@@ -90,6 +93,8 @@ export function ChartPanel() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<Candle | null>(null);
+  /** Bumped whenever the chart is rebuilt so the drawing layer repaints. */
+  const [revision, setRevision] = useState(0);
 
   const palette = PALETTES[theme];
   const paneIndicators = useMemo(
@@ -172,6 +177,8 @@ export function ChartPanel() {
     };
 
     chart.subscribeCrosshairMove(onCrosshair);
+    // Refs do not trigger renders; nudge one so the drawing layer receives them.
+    setRevision((r) => r + 1);
 
     return () => {
       chart.unsubscribeCrosshairMove(onCrosshair);
@@ -219,6 +226,7 @@ export function ChartPanel() {
       series = chart.addLineSeries({ ...shared, color: '#2962ff', lineWidth: 2 });
     }
     mainSeriesRef.current = series;
+    setRevision((r) => r + 1);
   }, [chartType, palette]);
 
   /* Feed data into price + volume series. */
@@ -254,6 +262,7 @@ export function ChartPanel() {
 
     candleIndexRef.current = new Map(candles.map((c) => [c.time, c]));
     chart.timeScale().fitContent();
+    setRevision((r) => r + 1);
   }, [candles, chartType, palette]);
 
   /* Overlay indicators drawn on the price scale. */
@@ -382,6 +391,25 @@ export function ChartPanel() {
   const shown = hover ?? candles[candles.length - 1] ?? null;
   const bullish = shown ? shown.close >= shown.open : true;
 
+  /* Indicator values at the bar under the crosshair, for the legend. */
+  const legend = useMemo(() => {
+    const at = shown?.time;
+    if (!at || candles.length === 0) return {} as Partial<Record<IndicatorId, number>>;
+    const valueAt = (points: Array<{ time: number; value: number }>) =>
+      points.find((p) => p.time === at)?.value;
+
+    const out: Partial<Record<IndicatorId, number>> = {};
+    for (const id of indicators) {
+      if (id === 'sma20') out.sma20 = valueAt(sma(candles, 20));
+      if (id === 'sma50') out.sma50 = valueAt(sma(candles, 50));
+      if (id === 'ema20') out.ema20 = valueAt(ema(candles, 20));
+      if (id === 'vwap') out.vwap = valueAt(vwap(candles));
+      if (id === 'bollinger') out.bollinger = valueAt(bollinger(candles).middle);
+      if (id === 'rsi') out.rsi = valueAt(rsi(candles));
+    }
+    return out;
+  }, [indicators, candles, shown]);
+
   return (
     <div className="relative flex min-h-0 flex-1 flex-col bg-surface">
       <div className="pointer-events-none absolute left-2.5 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
@@ -400,8 +428,11 @@ export function ChartPanel() {
         {indicators
           .filter((i) => !PANE_INDICATORS.includes(i))
           .map((id: IndicatorId) => (
-            <span key={id} className="text-dim">
-              {id.toUpperCase()}
+            <span key={id} className="tabular text-dim">
+              <span style={{ color: OVERLAY_COLORS[id] ?? 'inherit' }}>
+                {INDICATOR_LABELS[id]}
+              </span>{' '}
+              {legend[id] !== undefined ? price(legend[id]) : '—'}
             </span>
           ))}
       </div>
@@ -415,7 +446,19 @@ export function ChartPanel() {
         </div>
       )}
 
-      <div ref={containerRef} className="min-h-0 flex-1" />
+      <div className="flex min-h-0 flex-1">
+        <DrawingToolbar />
+        <div className="relative min-h-0 min-w-0 flex-1">
+          <div ref={containerRef} className="absolute inset-0" />
+          <DrawingCanvas
+            chart={chartRef.current}
+            series={mainSeriesRef.current}
+            candles={candles}
+            symbol={symbol}
+            revision={revision}
+          />
+        </div>
+      </div>
       {showPane && <div ref={paneRef} className="h-32 shrink-0 border-t border-line" />}
     </div>
   );

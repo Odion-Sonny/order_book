@@ -43,7 +43,7 @@ class Command(BaseCommand):
                 'live_stream',
                 {
                     'type': 'stream.message',
-                    'message': {'type': 'bar', 'data': data}
+                    'message': {'type': 'bar', 'source': 'live', 'data': data}
                 }
             )
 
@@ -51,6 +51,9 @@ class Command(BaseCommand):
             cl = get_channel_layer()
             if not cl:
                 return
+            # Mark the order book against the freshest print.
+            from order_book.services.book_builder import publish_tick
+            publish_tick(trade.symbol, float(trade.price))
             data = {
                 'symbol': trade.symbol,
                 'price': trade.price,
@@ -61,7 +64,7 @@ class Command(BaseCommand):
                 'live_stream',
                 {
                     'type': 'stream.message',
-                    'message': {'type': 'trade', 'data': data}
+                    'message': {'type': 'trade', 'source': 'live', 'data': data}
                 }
             )
 

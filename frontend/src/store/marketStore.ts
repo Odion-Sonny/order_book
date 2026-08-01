@@ -73,9 +73,30 @@ export const useMarketStore = create<MarketState>((set, get) => ({
       const side: TapePrint['side'] =
         print.side ?? (prev === undefined || print.price >= prev ? 'buy' : 'sell');
       const entry: TapePrint = { id: `p-${++printSeq}`, side, ...print };
+
+      // Keep the watchlist row in step with the tape: recompute the day's move
+      // against the snapshot's opening reference rather than waiting for a poll.
+      const snapshot = s.snapshots[print.ticker];
+      const snapshots = snapshot
+        ? {
+            ...s.snapshots,
+            [print.ticker]: (() => {
+              const base = snapshot.current_price - snapshot.price_change;
+              const change = base > 0 ? print.price - base : snapshot.price_change;
+              return {
+                ...snapshot,
+                current_price: print.price,
+                price_change: change,
+                price_change_percent: base > 0 ? (change / base) * 100 : snapshot.price_change_percent,
+              };
+            })(),
+          }
+        : s.snapshots;
+
       return {
         tape: [entry, ...s.tape].slice(0, MAX_TAPE),
         lastPrice: { ...s.lastPrice, [print.ticker]: print.price },
+        snapshots,
       };
     }),
 

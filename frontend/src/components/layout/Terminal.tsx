@@ -49,6 +49,7 @@ export function Terminal() {
   const applyBar = useMarketStore((s) => s.applyBar);
 
   const [mounted, setMounted] = useState(false);
+  const [feedSource, setFeedSource] = useState<'live' | 'sim' | null>(null);
 
   useKeyboardShortcuts();
 
@@ -76,7 +77,8 @@ export function Terminal() {
   }, [loadSnapshots]);
 
   const onStreamMessage = useCallback(
-    (msg: { type: string; data: unknown }) => {
+    (msg: { type: string; data: unknown; source?: string }) => {
+      if (msg.source) setFeedSource(msg.source === 'sim' ? 'sim' : 'live');
       if (msg.type === 'trade') {
         const trade = msg.data as StreamTrade;
         addPrint({
@@ -121,7 +123,7 @@ export function Terminal() {
 
   return (
     <div className="flex h-screen flex-col bg-bg text-fg">
-      <TopBar streamStatus={streamStatus} />
+      <TopBar streamStatus={streamStatus} feedSource={feedSource} />
 
       <div className="flex min-h-0 flex-1">
         <AnimatePresence initial={false}>

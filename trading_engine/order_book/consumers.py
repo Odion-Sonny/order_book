@@ -1,10 +1,15 @@
 import json
 import asyncio
+import os
 from channels.generic.websocket import AsyncWebsocketConsumer
 from channels.db import database_sync_to_async
 from .models import OrderBook, Order, Asset
 from .serializers import OrderBookSerializer
 from .services.alpaca_service import alpaca_service
+
+# How often the order book and market data consumers repush state.
+ORDERBOOK_REFRESH_SECONDS = float(os.getenv('ORDERBOOK_REFRESH_SECONDS', '1'))
+MARKET_REFRESH_SECONDS = float(os.getenv('MARKET_REFRESH_SECONDS', '5'))
 
 # aioredis is only used by the legacy pub/sub consumer below and no longer imports
 # on Python 3.11+. Keep it optional so the rest of the socket routes still load.
@@ -193,10 +198,10 @@ class OrderBookRealtimeConsumer(AsyncWebsocketConsumer):
                 pass
 
     async def send_periodic_updates(self):
-        """Send order book updates every 5 seconds"""
+        """Push order book updates on a tight cadence so the ladder feels live."""
         try:
             while True:
-                await asyncio.sleep(5)
+                await asyncio.sleep(ORDERBOOK_REFRESH_SECONDS)
                 await self.send_order_book_data()
         except asyncio.CancelledError:
             pass

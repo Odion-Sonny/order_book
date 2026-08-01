@@ -67,7 +67,13 @@ function IconToggle({
   );
 }
 
-export function TopBar({ streamStatus }: { streamStatus: StreamStatus }) {
+export function TopBar({
+  streamStatus,
+  feedSource,
+}: {
+  streamStatus: StreamStatus;
+  feedSource: 'live' | 'sim' | null;
+}) {
   const layout = useLayoutStore();
   const {
     symbol,
@@ -216,8 +222,26 @@ export function TopBar({ streamStatus }: { streamStatus: StreamStatus }) {
       <div className="flex-1" />
 
       <div className="mr-1 flex items-center gap-1.5 rounded bg-surface-2 px-2 py-1">
-        <span className={`h-1.5 w-1.5 rounded-full ${STATUS_COLOR[streamStatus]}`} />
+        <span
+          className={`h-1.5 w-1.5 rounded-full ${STATUS_COLOR[streamStatus]} ${
+            streamStatus === 'open' ? 'animate-pulse' : ''
+          }`}
+        />
         <span className="text-[10px] uppercase tracking-wide text-faint">{streamStatus}</span>
+        {feedSource && (
+          <span
+            title={
+              feedSource === 'sim'
+                ? 'Simulated ticks - the market is closed'
+                : 'Live market data'
+            }
+            className={`rounded px-1 text-[9px] font-semibold uppercase ${
+              feedSource === 'sim' ? 'bg-warn/20 text-warn' : 'bg-up/20 text-up'
+            }`}
+          >
+            {feedSource}
+          </span>
+        )}
       </div>
 
       <div className="relative">
