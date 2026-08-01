@@ -7,6 +7,7 @@ from .models import Asset, Order, OrderBook, Trade
 from .serializers import AssetSerializer, OrderSerializer, OrderBookSerializer
 from .services.matching_engine import MatchingEngine
 from .services.alpaca_service import alpaca_service
+from .services.book_builder import build_order_book, ensure_asset
 from .services.risk_management import RiskManagementService
 from .services.audit_logger import AuditLogger
 from django.db.models import Min, Max, Sum
@@ -347,120 +348,30 @@ class OrderBookViewSet(viewsets.ReadOnlyModelViewSet):
     
     @action(detail=False, methods=['get'])
     def by_ticker(self, request):
-        """Get order book by ticker symbol"""
+        """Get order book by ticker symbol, creating the asset on demand."""
         ticker = request.query_params.get('ticker')
         if not ticker:
             return Response({'error': 'ticker parameter is required'}, status=400)
-        
+
+        ticker = ticker.upper()
+        depth_levels = int(request.query_params.get('levels', 10))
+
         try:
-            asset = Asset.objects.get(ticker=ticker.upper())
-            order_book = OrderBook.objects.get(asset=asset)
-            
-            # Manually call the depth logic without requiring pk
-            depth_levels = int(request.query_params.get('levels', 10))
-            
-            # Get pending orders for this asset
-            # 1. Fetch Local Orders
-            local_bids = list(Order.objects.filter(
-                asset=order_book.asset,
-                side='BUY',
-                status='PENDING'
-            ).values('price').annotate(total_size=Sum('size')))
-            
-            local_asks = list(Order.objects.filter(
-                asset=order_book.asset,
-                side='SELL',
-                status='PENDING'
-            ).values('price').annotate(total_size=Sum('size')))
+            if not Asset.objects.filter(ticker=ticker).exists():
+                # Let users chart any tradable symbol, not only the seeded five.
+                if not ensure_asset(ticker):
+                    return Response(
+                        {'error': f'No market data available for {ticker}'}, status=404
+                    )
 
-            # 2. Fetch Alpaca "Background" Liquidity
-            alpaca_bids = []
-            alpaca_asks = []
-            market_data = {}
-            
-            try:
-                quotes = alpaca_service.get_latest_quotes([ticker])
-                if ticker in quotes and quotes[ticker]['ask_price'] > 0:
-                    market_data = quotes[ticker]
-                    bid_price = market_data['bid_price']
-                    ask_price = market_data['ask_price']
-                    spread = ask_price - bid_price
-                    
-                    # Generate 10 levels of background depth
-                    for i in range(10):
-                        # Bids
-                        p_bid = bid_price - (spread * 0.1 * i)
-                        alpaca_bids.append({
-                            'price': float(round(p_bid, 2)),
-                            'total_size': float(int(market_data['bid_size'] * (1 + i*0.2))) # Simulated depth
-                        })
-                        
-                        # Asks
-                        p_ask = ask_price + (spread * 0.1 * i)
-                        alpaca_asks.append({
-                            'price': float(round(p_ask, 2)),
-                            'total_size': float(int(market_data['ask_size'] * (1 + i*0.2)))
-                        })
-            except Exception as e:
-                print(f"Alpaca fetch failed: {e}")
+            return Response(build_order_book(ticker, levels=depth_levels))
 
-            # 3. Merge and Sort
-            # Combine
-            all_bids = []
-            for b in local_bids:
-                all_bids.append({'price': float(b['price']), 'size': float(b['total_size']), 'source': 'local'})
-            for b in alpaca_bids:
-                all_bids.append({'price': b['price'], 'size': b['total_size'], 'source': 'market'})
-                
-            all_asks = []
-            for a in local_asks:
-                all_asks.append({'price': float(a['price']), 'size': float(a['total_size']), 'source': 'local'})
-            for a in alpaca_asks:
-                all_asks.append({'price': a['price'], 'size': a['total_size'], 'source': 'market'})
-
-            # Sort
-            # Bids: Descending Price
-            all_bids.sort(key=lambda x: x['price'], reverse=True)
-            # Asks: Ascending Price
-            all_asks.sort(key=lambda x: x['price'])
-            
-            # Slice to requested depth
-            final_bids = all_bids[:depth_levels]
-            final_asks = all_asks[:depth_levels]
-
-            # 4. Calculate Cumulative Totals
-            response_bids = []
-            running_total = 0
-            for b in final_bids:
-                running_total += b['size']
-                response_bids.append({
-                    'price': b['price'],
-                    'size': b['size'],
-                    'total': round(running_total, 2)
-                })
-
-            response_asks = []
-            running_total = 0
-            for a in final_asks:
-                running_total += a['size']
-                response_asks.append({
-                    'price': a['price'],
-                    'size': a['size'],
-                    'total': round(running_total, 2)
-                })
-
-            return Response({
-                'bids': response_bids,
-                'asks': response_asks,
-                'last_price': float(order_book.last_price) if order_book.last_price else (market_data.get('ask_price', 0) + market_data.get('bid_price', 0))/2,
-                'ticker': ticker,
-                'market_data': market_data
-            })
-            
         except Asset.DoesNotExist:
             return Response({'error': f'Asset with ticker {ticker} not found'}, status=404)
-        except OrderBook.DoesNotExist:
-            return Response({'error': f'Order book for {ticker} not found'}, status=404)
+        except Exception as e:
+            return Response(
+                {'error': f'Failed to build order book for {ticker}: {e}'}, status=500
+            )
 
     @action(detail=True, methods=['get'])
     def depth(self, request, pk=None):

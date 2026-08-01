@@ -216,94 +216,13 @@ class OrderBookRealtimeConsumer(AsyncWebsocketConsumer):
 
     @database_sync_to_async
     def get_order_book_data(self):
-        """Get current order book data for the ticker"""
+        """Current order book for the ticker, built by the shared builder."""
+        from .services.book_builder import build_order_book, ensure_asset
+
         try:
-            from django.db.models import Sum
-            
-            asset = Asset.objects.get(ticker=self.ticker.upper())
-            order_book = OrderBook.objects.get(asset=asset)
-            
-            depth_levels = 10
-            
-            # Get pending orders for this asset
-            bids = Order.objects.filter(
-                asset=order_book.asset,
-                side='BUY',
-                status='PENDING'
-            ).values('price').annotate(
-                total_size=Sum('size')
-            ).order_by('-price')[:depth_levels]
-            
-            asks = Order.objects.filter(
-                asset=order_book.asset,
-                side='SELL',
-                status='PENDING'
-            ).values('price').annotate(
-                total_size=Sum('size')
-            ).order_by('price')[:depth_levels]
-            
-            # If no orders exist, create sample order book data from market prices
-            if not bids and not asks:
-                quotes = alpaca_service.get_latest_quotes([self.ticker])
-                
-                if self.ticker in quotes and quotes[self.ticker]['ask_price'] > 0:
-                    mid_price = (quotes[self.ticker]['bid_price'] + quotes[self.ticker]['ask_price']) / 2
-                    
-                    # Generate sample order book levels
-                    sample_bids = []
-                    sample_asks = []
-                    
-                    for i in range(depth_levels):
-                        bid_price = mid_price - (i + 1) * 0.01 * mid_price
-                        ask_price = mid_price + (i + 1) * 0.01 * mid_price
-                        
-                        sample_bids.append({
-                            'price': round(bid_price, 2),
-                            'size': 100 - i * 10,
-                            'total': round((100 - i * 10) * bid_price, 2)
-                        })
-                        
-                        sample_asks.append({
-                            'price': round(ask_price, 2),
-                            'size': 100 - i * 10,
-                            'total': round((100 - i * 10) * ask_price, 2)
-                        })
-                    
-                    return {
-                        'bids': sample_bids,
-                        'asks': sample_asks,
-                        'last_price': mid_price,
-                        'ticker': self.ticker
-                    }
-            
-            # Calculate cumulative totals for real orders
-            bid_list = []
-            running_bid_total = 0
-            for bid in bids:
-                running_bid_total += float(bid['total_size'])
-                bid_list.append({
-                    'price': float(bid['price']),
-                    'size': float(bid['total_size']),
-                    'total': round(running_bid_total * float(bid['price']), 2)
-                })
-            
-            ask_list = []
-            running_ask_total = 0
-            for ask in asks:
-                running_ask_total += float(ask['total_size'])
-                ask_list.append({
-                    'price': float(ask['price']),
-                    'size': float(ask['total_size']),
-                    'total': round(running_ask_total * float(ask['price']), 2)
-                })
-            
-            return {
-                'bids': bid_list,
-                'asks': ask_list,
-                'last_price': float(order_book.last_price) if order_book.last_price else 0,
-                'ticker': order_book.asset.ticker
-            }
-            
+            if not Asset.objects.filter(ticker=self.ticker.upper()).exists():
+                ensure_asset(self.ticker)
+            return build_order_book(self.ticker, levels=10)
         except Exception as e:
             print(f"Error getting order book data for {self.ticker}: {e}")
             return {
@@ -311,8 +230,8 @@ class OrderBookRealtimeConsumer(AsyncWebsocketConsumer):
                 'asks': [],
                 'last_price': 0,
                 'ticker': self.ticker,
-                'error': str(e)
-            } 
+                'error': str(e),
+            }
 
 class LiveStreamConsumer(AsyncWebsocketConsumer):
     async def connect(self):
