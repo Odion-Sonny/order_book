@@ -15,6 +15,13 @@ import type { Candle } from '@/types';
 const FIB_LEVELS = [0, 0.236, 0.382, 0.5, 0.618, 0.786, 1];
 const HIT_TOLERANCE = 6;
 
+/**
+ * Shared empty result for symbols with no drawings. A fresh `[]` inside the
+ * selector is a new reference on every snapshot, which makes the store look
+ * perpetually changed and spins React into an infinite render loop.
+ */
+const NO_DRAWINGS: Drawing[] = [];
+
 interface DrawingCanvasProps {
   chart: IChartApi | null;
   series: ISeriesApi<SeriesType> | null;
@@ -28,7 +35,7 @@ export function DrawingCanvas({ chart, series, candles, symbol, revision }: Draw
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const { tool, color, width, magnet, selectedId, add, update, remove, setSelected, setTool } =
     useDrawingStore();
-  const drawings = useDrawingStore((s) => s.bySymbol[symbol] ?? []);
+  const drawings = useDrawingStore((s) => s.bySymbol[symbol] ?? NO_DRAWINGS);
 
   const [pending, setPending] = useState<Anchor[]>([]);
   const [cursor, setCursor] = useState<Anchor | null>(null);

@@ -14,8 +14,10 @@ export const viewport: Viewport = {
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
   return (
+    // Extensions (ColorZilla, Grammarly, password managers) stamp attributes on
+    // <html>/<body> before React hydrates; both need the warning suppressed.
     <html lang="en" data-theme="dark" suppressHydrationWarning>
-      <body>{children}</body>
+      <body suppressHydrationWarning>{children}</body>
     </html>
   );
 }
