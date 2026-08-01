@@ -22,7 +22,14 @@ import { INDICATOR_LABELS, type IndicatorId } from '@/lib/indicators';
 import { pct, price } from '@/lib/format';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
-import { HISTORY_RANGES, TIMEFRAMES, useSymbolStore, type ChartType } from '@/store/symbolStore';
+import {
+  INTERVALS,
+  RANGES,
+  barsFor,
+  isValidPair,
+  useSymbolStore,
+  type ChartType,
+} from '@/store/symbolStore';
 import { SHORTCUTS } from '@/hooks/useKeyboardShortcuts';
 import { useAuthStore } from '@/store/authStore';
 import type { StreamStatus } from '@/lib/ws';
@@ -133,30 +140,47 @@ export function TopBar({
 
       <div className="mx-2 h-5 w-px bg-line" />
 
+      {/* Resolution. Options outside the current range stay clickable — picking
+          one widens or narrows the range to the nearest one that fits. */}
       <div className="flex items-center gap-0.5">
-        {TIMEFRAMES.map((tf) => (
-          <button
-            key={tf}
-            type="button"
-            onClick={() => setTimeframe(tf)}
-            className={`rounded px-1.5 py-1 text-[11px] font-medium transition-colors ${
-              timeframe === tf ? 'bg-accent text-white' : 'text-dim hover:bg-surface-2 hover:text-fg'
-            }`}
-          >
-            {tf.replace('Min', 'm').replace('Hour', 'H').replace('Day', 'D').replace('Week', 'W')}
-          </button>
-        ))}
+        {INTERVALS.map(({ id, label }) => {
+          const fits = isValidPair(range, id);
+          return (
+            <button
+              key={id}
+              type="button"
+              onClick={() => setTimeframe(id)}
+              title={
+                fits
+                  ? `${label} bars — ${barsFor(range, id)} over ${range}`
+                  : `${label} bars don't fit ${range}; switches the range too`
+              }
+              className={`rounded px-1.5 py-1 text-[11px] font-medium transition-colors ${
+                timeframe === id
+                  ? 'bg-accent text-white'
+                  : fits
+                    ? 'text-dim hover:bg-surface-2 hover:text-fg'
+                    : 'text-faint/40 hover:bg-surface-2 hover:text-fg'
+              }`}
+            >
+              {label}
+            </button>
+          );
+        })}
       </div>
 
       <div className="mx-2 hidden h-5 w-px bg-line lg:block" />
 
       <div className="hidden items-center gap-0.5 lg:flex">
-        {HISTORY_RANGES.map((preset) => (
+        {RANGES.map((preset) => (
           <button
             key={preset.id}
             type="button"
             onClick={() => setRange(preset.id)}
-            title={`${preset.label} history (${preset.timeframe})`}
+            title={`${preset.label} of history — ${barsFor(
+              preset.id,
+              isValidPair(preset.id, timeframe) ? timeframe : preset.defaultInterval,
+            )} bars`}
             className={`rounded px-1.5 py-1 text-[11px] transition-colors ${
               range === preset.id
                 ? 'bg-surface-3 text-fg'

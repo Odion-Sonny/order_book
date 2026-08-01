@@ -31,7 +31,7 @@ import {
 import { log } from '@/store/logStore';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
-import { currentRange, useSymbolStore } from '@/store/symbolStore';
+import { barsFor, useSymbolStore } from '@/store/symbolStore';
 import type { Candle } from '@/types';
 
 interface Palette {
@@ -114,12 +114,14 @@ export function ChartPanel() {
 
   useEffect(() => {
     let cancelled = false;
-    const preset = currentRange(range);
+    // Bar count comes from range ÷ resolution. The old floor of 200 bars meant
+    // "1D" and "6M" fetched the same window, so the range buttons did nothing.
+    const bars = barsFor(range, timeframe);
 
     setLoading(true);
     setError(null);
     api
-      .chartData(symbol, timeframe, Math.max(preset.limit, 200))
+      .chartData(symbol, timeframe, bars)
       .then((data) => {
         if (cancelled) return;
         setCandles(data);
@@ -427,7 +429,8 @@ export function ChartPanel() {
     <div className="relative flex min-h-0 flex-1 flex-col bg-surface">
       <div className="pointer-events-none absolute left-2.5 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
         <span className="font-semibold text-fg">
-          {symbol} · {timeframe}
+          {symbol} · {timeframe} · {range}
+          <span className="ml-1 font-normal text-faint">{candles.length} bars</span>
         </span>
         {shown && (
           <span className={`tabular flex gap-2 ${bullish ? 'text-up' : 'text-down'}`}>
