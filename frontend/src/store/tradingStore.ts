@@ -1,7 +1,7 @@
 'use client';
 
 import { create } from 'zustand';
-import { api } from '@/lib/api';
+import { api, getToken } from '@/lib/api';
 import { log } from './logStore';
 import type { Order, OrderSide, OrderType, Portfolio, Position } from '@/types';
 
@@ -33,6 +33,13 @@ export const useTradingStore = create<TradingState>((set, get) => ({
   error: null,
 
   refresh: async () => {
+    // Every trading endpoint is IsAuthenticated; calling them signed out just
+    // produces a burst of 401s in the console and the server log.
+    if (!getToken()) {
+      set({ portfolio: null, positions: [], orders: [], loading: false });
+      return;
+    }
+
     set({ loading: true });
     const [portfolio, positions, orders] = await Promise.all([
       api.portfolio().catch(() => null),

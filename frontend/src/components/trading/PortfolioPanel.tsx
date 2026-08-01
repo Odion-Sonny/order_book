@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { useEffect } from 'react';
 import { OrderTicket } from './OrderTicket';
 import { money, num, pct } from '@/lib/format';
+import { useAuthStore } from '@/store/authStore';
 import { useTradingStore } from '@/store/tradingStore';
 
 function Metric({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' }) {
@@ -23,10 +24,13 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: '
 
 export function PortfolioPanel() {
   const { portfolio, positions, orders, loading, refresh } = useTradingStore();
+  const authenticated = useAuthStore((s) => s.authenticated);
+  const setModalOpen = useAuthStore((s) => s.setModalOpen);
 
+  // Re-fetch when auth flips, so signing in fills the panel immediately.
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, authenticated]);
 
   const marketValue = positions.reduce(
     (sum, p) => sum + num(p.quantity) * num(p.current_price),
@@ -53,10 +57,17 @@ export function PortfolioPanel() {
           >
             <RefreshCw size={12} className={loading ? 'animate-spin' : ''} />
           </button>
-          {!portfolio && !loading && (
-            <span className="text-[11px] text-warn">
-              Sign in to the Django API to load a portfolio
-            </span>
+          {!authenticated && (
+            <button
+              type="button"
+              onClick={() => setModalOpen(true)}
+              className="rounded bg-accent px-2 py-0.5 text-[11px] font-semibold text-white"
+            >
+              Sign in to load your portfolio
+            </button>
+          )}
+          {authenticated && !portfolio && !loading && (
+            <span className="text-[11px] text-warn">No portfolio for this account</span>
           )}
         </div>
 

@@ -143,10 +143,17 @@ export const api = {
       `/orderbooks/by_ticker/?ticker=${encodeURIComponent(ticker)}&levels=${levels}`,
     ),
 
+  /**
+   * Market tape. `/trades/` is scoped to the signed-in user's fills and 401s
+   * when signed out; `/trades-list/` is the public market feed.
+   */
   trades: (ticker?: string, limit = 100) =>
     request<unknown>(
-      `/trades/?limit=${limit}${ticker ? `&ticker=${encodeURIComponent(ticker)}` : ''}`,
+      `/trades-list/?limit=${limit}${ticker ? `&ticker=${encodeURIComponent(ticker)}` : ''}`,
     ).then(list<Trade>),
+
+  /** The signed-in user's own executions. */
+  myTrades: (limit = 100) => request<unknown>(`/trades/?limit=${limit}`).then(list<Trade>),
 
   orders: () => request<unknown>('/orders/').then(list<Order>),
 

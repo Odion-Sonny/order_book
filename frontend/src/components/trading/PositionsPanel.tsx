@@ -3,6 +3,7 @@
 import { motion } from 'framer-motion';
 import { useEffect, useState } from 'react';
 import { money, num, pct, price } from '@/lib/format';
+import { useAuthStore } from '@/store/authStore';
 import { useMarketStore } from '@/store/marketStore';
 import { useSymbolStore } from '@/store/symbolStore';
 import { useTradingStore } from '@/store/tradingStore';
@@ -14,10 +15,11 @@ export function PositionsPanel() {
   const lastPrice = useMarketStore((s) => s.lastPrice);
   const setSymbol = useSymbolStore((s) => s.setSymbol);
   const [tab, setTab] = useState<Tab>('positions');
+  const authenticated = useAuthStore((s) => s.authenticated);
 
   useEffect(() => {
     void refresh();
-  }, [refresh]);
+  }, [refresh, authenticated]);
 
   return (
     <div className="flex h-full flex-col">
@@ -85,7 +87,9 @@ export function PositionsPanel() {
               {positions.length === 0 && (
                 <tr>
                   <td colSpan={7} className="px-2 py-8 text-center text-faint">
-                    No open positions. Submit a simulated order from the Portfolio tab.
+                    {authenticated
+                      ? 'No open positions. Submit a simulated order from the Portfolio tab.'
+                      : 'Sign in to see your positions.'}
                   </td>
                 </tr>
               )}

@@ -95,6 +95,13 @@ export function ChartPanel() {
   const [hover, setHover] = useState<Candle | null>(null);
   /** Bumped whenever the chart is rebuilt so the drawing layer repaints. */
   const [revision, setRevision] = useState(0);
+  /**
+   * Handed to the drawing layer as state, not refs: a ref would still point at
+   * a chart that has been disposed by a theme or chart-type change, and every
+   * call on it throws.
+   */
+  const [chartApi, setChartApi] = useState<IChartApi | null>(null);
+  const [seriesApi, setSeriesApi] = useState<ISeriesApi<SeriesType> | null>(null);
 
   const palette = PALETTES[theme];
   const paneIndicators = useMemo(
@@ -177,10 +184,12 @@ export function ChartPanel() {
     };
 
     chart.subscribeCrosshairMove(onCrosshair);
-    // Refs do not trigger renders; nudge one so the drawing layer receives them.
-    setRevision((r) => r + 1);
+    setChartApi(chart);
 
     return () => {
+      // Drop the handles before disposing so nothing can call into a dead chart.
+      setChartApi(null);
+      setSeriesApi(null);
       chart.unsubscribeCrosshairMove(onCrosshair);
       chart.remove();
       chartRef.current = null;
@@ -226,8 +235,12 @@ export function ChartPanel() {
       series = chart.addLineSeries({ ...shared, color: '#2962ff', lineWidth: 2 });
     }
     mainSeriesRef.current = series;
-    setRevision((r) => r + 1);
-  }, [chartType, palette]);
+    setSeriesApi(series);
+
+    return () => {
+      setSeriesApi(null);
+    };
+  }, [chartType, palette, chartApi]);
 
   /* Feed data into price + volume series. */
   useEffect(() => {
@@ -451,8 +464,8 @@ export function ChartPanel() {
         <div className="relative min-h-0 min-w-0 flex-1">
           <div ref={containerRef} className="absolute inset-0" />
           <DrawingCanvas
-            chart={chartRef.current}
-            series={mainSeriesRef.current}
+            chart={chartApi}
+            series={seriesApi}
             candles={candles}
             symbol={symbol}
             revision={revision}

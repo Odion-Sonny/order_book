@@ -7,7 +7,7 @@ from .models import Asset, Order, OrderBook, Trade
 from .serializers import AssetSerializer, OrderSerializer, OrderBookSerializer
 from .services.matching_engine import MatchingEngine
 from .services.alpaca_service import alpaca_service
-from .services.book_builder import build_order_book, ensure_asset
+from .services.book_builder import build_order_book, ensure_asset, reference_price
 from .services.risk_management import RiskManagementService
 from .services.audit_logger import AuditLogger
 from django.db.models import Min, Max, Sum
@@ -545,14 +545,16 @@ def trades_list(request):
         if assets:
             sample_trades = []
             base_time = timezone.now()
+            # Price each symbol once; reference_price falls back through the
+            # tick cache, quote, last trade and stored price, so a closed market
+            # no longer prints everything at a hardcoded 100.
+            price_by_ticker = {a.ticker: reference_price(a.ticker) for a in assets}
+
             for i in range(min(limit, 15)):
                 asset = random.choice(assets)
-                # Get current market price
-                quotes = alpaca_service.get_latest_quotes([asset.ticker])
-                base_price = 100  # Default fallback
-
-                if asset.ticker in quotes and quotes[asset.ticker]['ask_price'] > 0:
-                    base_price = (quotes[asset.ticker]['bid_price'] + quotes[asset.ticker]['ask_price']) / 2
+                base_price = price_by_ticker.get(asset.ticker) or 0
+                if base_price <= 0:
+                    continue
 
                 price_variation = random.uniform(-0.02, 0.02)
                 trade_price = base_price * (1 + price_variation)

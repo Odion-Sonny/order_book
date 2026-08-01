@@ -41,10 +41,15 @@ export function DrawingCanvas({ chart, series, candles, symbol, revision }: Draw
   const toCanvas = useCallback(
     (anchor: Anchor): { x: number; y: number } | null => {
       if (!chart || !series) return null;
-      const x = chart.timeScale().timeToCoordinate(anchor.time as Time);
-      const y = series.priceToCoordinate(anchor.price);
-      if (x === null || y === null) return null;
-      return { x, y };
+      try {
+        const x = chart.timeScale().timeToCoordinate(anchor.time as Time);
+        const y = series.priceToCoordinate(anchor.price);
+        if (x === null || y === null) return null;
+        return { x, y };
+      } catch {
+        // Chart disposed between render and paint.
+        return null;
+      }
     },
     [chart, series],
   );
@@ -52,8 +57,14 @@ export function DrawingCanvas({ chart, series, candles, symbol, revision }: Draw
   const toAnchor = useCallback(
     (x: number, y: number): Anchor | null => {
       if (!chart || !series) return null;
-      const time = chart.timeScale().coordinateToTime(x);
-      const price = series.coordinateToPrice(y);
+      let time: unknown;
+      let price: number | null;
+      try {
+        time = chart.timeScale().coordinateToTime(x);
+        price = series.coordinateToPrice(y);
+      } catch {
+        return null;
+      }
       if (time === null || price === null) return null;
 
       let anchor: Anchor = { time: Number(time), price: Number(price) };
@@ -160,7 +171,7 @@ export function DrawingCanvas({ chart, series, candles, symbol, revision }: Draw
           ctx.font = '10px ui-monospace, monospace';
           for (const level of FIB_LEVELS) {
             const levelPrice = hi - (hi - lo) * level;
-            const y = series?.priceToCoordinate(levelPrice);
+            const y = toCanvas({ time: drawing.points[0].time, price: levelPrice })?.y;
             if (y === null || y === undefined) continue;
             ctx.globalAlpha = 0.85;
             ctx.beginPath();
@@ -254,11 +265,19 @@ export function DrawingCanvas({ chart, series, candles, symbol, revision }: Draw
   useEffect(() => {
     if (!chart) return;
     const repaint = () => paint();
-    chart.timeScale().subscribeVisibleLogicalRangeChange(repaint);
+    try {
+      chart.timeScale().subscribeVisibleLogicalRangeChange(repaint);
+    } catch {
+      return;
+    }
     window.addEventListener('resize', repaint);
     return () => {
-      chart.timeScale().unsubscribeVisibleLogicalRangeChange(repaint);
       window.removeEventListener('resize', repaint);
+      try {
+        chart.timeScale().unsubscribeVisibleLogicalRangeChange(repaint);
+      } catch {
+        // Chart already disposed; nothing to detach from.
+      }
     };
   }, [chart, paint]);
 

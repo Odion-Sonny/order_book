@@ -81,14 +81,19 @@ export interface Order {
   executed_at?: string | null;
 }
 
+/**
+ * `/trades/` (user fills) and `/trades-list/` (public tape) return slightly
+ * different shapes: executed_at vs timestamp, asset_ticker vs asset.
+ */
 export interface Trade {
-  id: number;
-  asset?: number;
+  id: number | string;
+  asset?: number | string;
   asset_ticker?: string;
   ticker?: string;
   price: string | number;
   size: string | number;
-  executed_at: string;
+  executed_at?: string;
+  timestamp?: string;
   side?: OrderSide;
 }
 

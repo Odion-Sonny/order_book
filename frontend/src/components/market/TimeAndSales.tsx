@@ -31,7 +31,8 @@ export function TimeAndSales() {
             ticker: symbol,
             price: num(trade.price),
             size: num(trade.size),
-            ts: Date.parse(trade.executed_at) || Date.now(),
+            ts: Date.parse(trade.executed_at ?? trade.timestamp ?? '') || Date.now(),
+            side: trade.side === 'SELL' ? 'sell' : trade.side === 'BUY' ? 'buy' : undefined,
           });
         }
       })
