@@ -128,9 +128,19 @@ export const api = {
     });
   },
 
-  chartData: async (ticker: string, timeframe: Timeframe, limit = 500): Promise<Candle[]> => {
+  /**
+   * Historical bars. `end` (ISO) pages backwards: the newest `limit` bars that
+   * finish before that instant, used to extend history as the user pans left.
+   */
+  chartData: async (
+    ticker: string,
+    timeframe: Timeframe,
+    limit = 500,
+    end?: string,
+  ): Promise<Candle[]> => {
     const data = await request<{ bars?: Bar[] }>(
-      `/assets/chart_data/?ticker=${encodeURIComponent(ticker)}&timeframe=${timeframe}&limit=${limit}`,
+      `/assets/chart_data/?ticker=${encodeURIComponent(ticker)}&timeframe=${timeframe}&limit=${limit}` +
+        (end ? `&end=${encodeURIComponent(end)}` : ''),
     );
     return (data.bars ?? [])
       .map(toCandle)

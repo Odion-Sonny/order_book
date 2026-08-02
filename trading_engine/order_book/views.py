@@ -103,13 +103,19 @@ class AssetViewSet(viewsets.ModelViewSet):
         ticker = request.query_params.get('ticker')
         timeframe = request.query_params.get('timeframe', '1Day')
         limit = int(request.query_params.get('limit', 30))
+        # `end` lets the chart page backwards: ask for the newest `limit` bars
+        # that finish before the oldest bar already on screen.
+        start = request.query_params.get('start') or None
+        end = request.query_params.get('end') or None
 
         if not ticker:
             return Response({'error': 'ticker parameter is required'}, status=400)
 
         try:
             # Get historical bars from Alpaca
-            bars = alpaca_service.get_stock_bars([ticker], timeframe=timeframe, limit=limit)
+            bars = alpaca_service.get_stock_bars(
+                [ticker], timeframe=timeframe, limit=limit, start=start, end=end
+            )
 
             if ticker in bars:
                 return Response({'bars': bars[ticker]})

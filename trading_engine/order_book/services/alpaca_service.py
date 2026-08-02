@@ -141,10 +141,13 @@ class AlpacaService:
                 try:
                     if start is None:
                         # Span the requested number of bars, with a 60% buffer for
-                        # weekends and holidays.
+                        # weekends and holidays. Anchor on `end` when the caller is
+                        # paging backwards, otherwise the window would sit around
+                        # today and miss the older range entirely.
                         per_bar = self._TIMEFRAME_DAYS.get(timeframe, 1)
                         days_to_fetch = max(int(limit * per_bar * 1.6), 2)
-                        bar_start = datetime.now() - timedelta(days=days_to_fetch)
+                        anchor = end or datetime.now()
+                        bar_start = anchor - timedelta(days=days_to_fetch)
                     else:
                         bar_start = start
 

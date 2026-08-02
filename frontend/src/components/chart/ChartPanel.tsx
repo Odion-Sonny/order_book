@@ -73,6 +73,12 @@ const OVERLAY_COLORS: Record<string, string> = {
 
 const asTime = (t: number) => t as UTCTimestamp;
 
+/**
+ * Fetch older bars once the viewport comes within this many bars of the start
+ * of the loaded history, so the data arrives before the user reaches the edge.
+ */
+const LOAD_MORE_THRESHOLD = 12;
+
 export function ChartPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -91,6 +97,16 @@ export function ChartPanel() {
 
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(false);
+  const [loadingMore, setLoadingMore] = useState(false);
+  /** Latest candles, so the range subscription never closes over a stale array. */
+  const candlesRef = useRef<Candle[]>([]);
+  /** Set once the venue has no more history for this symbol/resolution. */
+  const exhaustedRef = useRef(false);
+  const loadingMoreRef = useRef(false);
+  /** Bars just prepended, used to hold the viewport still across the update. */
+  const shiftRef = useRef(0);
+  /** Frame the data on the next paint (new symbol, resolution or range). */
+  const fitRef = useRef(true);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<Candle | null>(null);
   /** Bumped whenever the chart is rebuilt so the drawing layer repaints. */
@@ -118,6 +134,13 @@ export function ChartPanel() {
     // "1D" and "6M" fetched the same window, so the range buttons did nothing.
     const bars = barsFor(range, timeframe);
 
+    // A fresh symbol/range starts a new history: allow paging again and let the
+    // next paint frame the data.
+    exhaustedRef.current = false;
+    loadingMoreRef.current = false;
+    shiftRef.current = 0;
+    fitRef.current = true;
+
     setLoading(true);
     setError(null);
     api
@@ -139,6 +162,92 @@ export function ChartPanel() {
       cancelled = true;
     };
   }, [symbol, timeframe, range]);
+
+  /*
+   * Extend history when the user pans or zooms past the oldest loaded bar.
+   * Without this the chart simply ends in mid-air at whatever the range
+   * preset fetched, which reads as missing data rather than a boundary.
+   */
+  const loadOlder = useCallback(async () => {
+    if (loadingMoreRef.current || exhaustedRef.current) return;
+    const oldest = candlesRef.current[0];
+    if (!oldest) return;
+
+    loadingMoreRef.current = true;
+    setLoadingMore(true);
+    try {
+      const older = await api.chartData(
+        symbol,
+        timeframe,
+        barsFor(range, timeframe),
+        new Date(oldest.time * 1000).toISOString(),
+      );
+
+      /*
+       * Merge by timestamp rather than splicing at the boundary. The page
+       * deliberately overlaps the bar we anchored on, and `candlesRef` only
+       * catches up on the next render, so a splice can interleave a stale
+       * cutoff with newer bars — which lightweight-charts rejects outright
+       * ("data must be asc ordered by time").
+       */
+      const current = candlesRef.current;
+      const byTime = new Map(current.map((c) => [c.time, c]));
+      let added = 0;
+      for (const candle of older) {
+        if (!byTime.has(candle.time)) {
+          byTime.set(candle.time, candle);
+          added += 1;
+        }
+      }
+
+      if (added === 0) {
+        exhaustedRef.current = true;
+        return;
+      }
+
+      const merged = [...byTime.values()].sort((a, b) => a.time - b.time);
+      // Keep the ref in step now: the next page may be requested before React
+      // re-renders, and it must not measure against the pre-merge array.
+      candlesRef.current = merged;
+      // Keep the viewport still: prepending shifts every logical index right.
+      shiftRef.current = added;
+      setCandles(merged);
+    } catch (err) {
+      exhaustedRef.current = true;
+      log(
+        'warn',
+        'chart',
+        `No older ${timeframe} bars for ${symbol}: ${err instanceof Error ? err.message : 'request failed'}`,
+      );
+    } finally {
+      loadingMoreRef.current = false;
+      setLoadingMore(false);
+    }
+  }, [symbol, timeframe, range]);
+
+  useEffect(() => {
+    if (!chartApi) return;
+    const timeScale = chartApi.timeScale();
+
+    const onRangeChange = (logicalRange: LogicalRange | null) => {
+      if (!logicalRange) return;
+      // `from` goes negative once the viewport runs past the first bar.
+      if (logicalRange.from < LOAD_MORE_THRESHOLD) void loadOlder();
+    };
+
+    try {
+      timeScale.subscribeVisibleLogicalRangeChange(onRangeChange);
+    } catch {
+      return;
+    }
+    return () => {
+      try {
+        timeScale.unsubscribeVisibleLogicalRangeChange(onRangeChange);
+      } catch {
+        // Chart already disposed.
+      }
+    };
+  }, [chartApi, loadOlder]);
 
   /* -------------------------------------------------------------- charts */
 
@@ -276,7 +385,24 @@ export function ChartPanel() {
     );
 
     candleIndexRef.current = new Map(candles.map((c) => [c.time, c]));
-    chart.timeScale().fitContent();
+    candlesRef.current = candles;
+
+    if (fitRef.current) {
+      chart.timeScale().fitContent();
+      fitRef.current = false;
+    } else if (shiftRef.current > 0) {
+      // Older bars were prepended: every logical index moved right by that many,
+      // so shift the viewport back to leave the user looking at the same candles.
+      const shift = shiftRef.current;
+      shiftRef.current = 0;
+      const visible = chart.timeScale().getVisibleLogicalRange();
+      if (visible) {
+        chart.timeScale().setVisibleLogicalRange({
+          from: visible.from + shift,
+          to: visible.to + shift,
+        });
+      }
+    }
     setRevision((r) => r + 1);
   }, [candles, chartType, palette]);
 
@@ -453,8 +579,10 @@ export function ChartPanel() {
           ))}
       </div>
 
-      {loading && (
-        <div className="absolute right-3 top-2 z-10 text-[11px] text-faint">loading…</div>
+      {(loading || loadingMore) && (
+        <div className="absolute right-3 top-2 z-10 text-[11px] text-faint">
+          {loadingMore ? 'loading history…' : 'loading…'}
+        </div>
       )}
       {error && !loading && (
         <div className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 text-center text-xs text-down">
