@@ -79,6 +79,19 @@ const asTime = (t: number) => t as UTCTimestamp;
  */
 const LOAD_MORE_THRESHOLD = 12;
 
+/**
+ * Load this many times the visible window. The range button frames what you
+ * see; the surplus sits off-screen to the left so panning and switching to a
+ * wider range are instant instead of a round trip.
+ */
+const HISTORY_BUFFER = 4;
+
+/** Ceiling on a single request, so a wide range can't stall the browser. */
+const MAX_FETCH_BARS = 5000;
+
+/** Empty bars kept to the right of the last candle, for breathing room. */
+const RIGHT_MARGIN_BARS = 4;
+
 export function ChartPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
   const paneRef = useRef<HTMLDivElement>(null);
@@ -105,8 +118,12 @@ export function ChartPanel() {
   const loadingMoreRef = useRef(false);
   /** Bars just prepended, used to hold the viewport still across the update. */
   const shiftRef = useRef(0);
-  /** Frame the data on the next paint (new symbol, resolution or range). */
-  const fitRef = useRef(true);
+  /** Frame the visible window on the next paint (new symbol, resolution, range). */
+  const frameRef = useRef(true);
+  /** What the loaded series actually is, to tell a zoom from a new dataset. */
+  const lastFetchRef = useRef<{ symbol: string; timeframe: string } | null>(null);
+  /** Lets the top-up effect call loadOlder without depending on its identity. */
+  const loadOlderRef = useRef<(() => Promise<void>) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<Candle | null>(null);
   /** Bumped whenever the chart is rebuilt so the drawing layer repaints. */
@@ -128,23 +145,36 @@ export function ChartPanel() {
 
   /* ---------------------------------------------------------------- data */
 
+  /** Bars the range asks to *show*. */
+  const visibleBars = barsFor(range, timeframe);
+  /** Bars to *load* — a buffer past the window, so panning has somewhere to go. */
+  const fetchBars = Math.min(MAX_FETCH_BARS, visibleBars * HISTORY_BUFFER);
+
   useEffect(() => {
     let cancelled = false;
-    // Bar count comes from range ÷ resolution. The old floor of 200 bars meant
-    // "1D" and "6M" fetched the same window, so the range buttons did nothing.
-    const bars = barsFor(range, timeframe);
 
-    // A fresh symbol/range starts a new history: allow paging again and let the
-    // next paint frame the data.
+    // Reframe on any of these changes; the data effect applies it after setData.
+    frameRef.current = true;
+
+    /*
+     * A range change at the same resolution is a zoom, not a new dataset: 6M
+     * already holds the bars 1M and 1D need, so reframe what is loaded instead
+     * of refetching. Only a new symbol or resolution actually needs the network.
+     */
+    const sameSeries =
+      lastFetchRef.current?.symbol === symbol && lastFetchRef.current?.timeframe === timeframe;
+    if (sameSeries && candlesRef.current.length >= visibleBars) return;
+
+    // A fresh symbol/resolution starts a new history: allow paging again.
     exhaustedRef.current = false;
     loadingMoreRef.current = false;
     shiftRef.current = 0;
-    fitRef.current = true;
+    lastFetchRef.current = { symbol, timeframe };
 
     setLoading(true);
     setError(null);
     api
-      .chartData(symbol, timeframe, bars)
+      .chartData(symbol, timeframe, fetchBars)
       .then((data) => {
         if (cancelled) return;
         setCandles(data);
@@ -161,7 +191,16 @@ export function ChartPanel() {
     return () => {
       cancelled = true;
     };
-  }, [symbol, timeframe, range]);
+  }, [symbol, timeframe, range, visibleBars, fetchBars]);
+
+  /*
+   * Widening the range beyond what is loaded (6M -> 1Y at the same resolution)
+   * tops up from the same paging path the pan-left handler uses.
+   */
+  useEffect(() => {
+    if (loading || candles.length === 0) return;
+    if (candles.length < visibleBars && !exhaustedRef.current) void loadOlderRef.current?.();
+  }, [candles, visibleBars, loading]);
 
   /*
    * Extend history when the user pans or zooms past the oldest loaded bar.
@@ -224,6 +263,10 @@ export function ChartPanel() {
       setLoadingMore(false);
     }
   }, [symbol, timeframe, range]);
+
+  useEffect(() => {
+    loadOlderRef.current = loadOlder;
+  }, [loadOlder]);
 
   useEffect(() => {
     if (!chartApi) return;
@@ -387,10 +430,7 @@ export function ChartPanel() {
     candleIndexRef.current = new Map(candles.map((c) => [c.time, c]));
     candlesRef.current = candles;
 
-    if (fitRef.current) {
-      chart.timeScale().fitContent();
-      fitRef.current = false;
-    } else if (shiftRef.current > 0) {
+    if (shiftRef.current > 0) {
       // Older bars were prepended: every logical index moved right by that many,
       // so shift the viewport back to leave the user looking at the same candles.
       const shift = shiftRef.current;
@@ -405,6 +445,24 @@ export function ChartPanel() {
     }
     setRevision((r) => r + 1);
   }, [candles, chartType, palette]);
+
+  /*
+   * Frame the visible window. Runs after the data effect above, and also on a
+   * range-only change where `candles` is untouched — that is the case that lets
+   * 6M -> 1M -> 1D reframe the same loaded series with no refetch.
+   */
+  useEffect(() => {
+    const chart = chartRef.current;
+    if (!chart || candles.length === 0 || !frameRef.current) return;
+
+    const len = candles.length;
+    chart.timeScale().setVisibleLogicalRange({
+      from: Math.max(0, len - visibleBars),
+      to: len - 1 + RIGHT_MARGIN_BARS,
+    });
+    frameRef.current = false;
+    setRevision((r) => r + 1);
+  }, [candles, visibleBars, range, chartType]);
 
   /* Overlay indicators drawn on the price scale. */
   useEffect(() => {
@@ -556,7 +614,9 @@ export function ChartPanel() {
       <div className="pointer-events-none absolute left-2.5 top-2 z-10 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px]">
         <span className="font-semibold text-fg">
           {symbol} · {timeframe} · {range}
-          <span className="ml-1 font-normal text-faint">{candles.length} bars</span>
+          <span className="ml-1 font-normal text-faint">
+            {Math.min(visibleBars, candles.length)} shown / {candles.length} loaded
+          </span>
         </span>
         {shown && (
           <span className={`tabular flex gap-2 ${bullish ? 'text-up' : 'text-down'}`}>
