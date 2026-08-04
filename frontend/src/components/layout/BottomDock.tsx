@@ -2,6 +2,8 @@
 
 import { motion } from 'framer-motion';
 import { ChevronDown, GripHorizontal, Maximize2, Minimize2 } from 'lucide-react';
+import { AnalysisPanel } from '@/components/analysis/AnalysisPanel';
+import { CoachPanel } from '@/components/analysis/CoachPanel';
 import { LogsPanel } from '@/components/strategy/LogsPanel';
 import { PythonEditorPanel } from '@/components/strategy/PythonEditorPanel';
 import { StrategyOutputPanel } from '@/components/strategy/StrategyOutputPanel';
@@ -11,6 +13,8 @@ import { BOTTOM_TABS, useLayoutStore, type BottomTabId } from '@/store/layoutSto
 import { useLogStore } from '@/store/logStore';
 
 const PANELS: Record<BottomTabId, () => React.ReactElement> = {
+  analysis: AnalysisPanel,
+  coach: CoachPanel,
   editor: PythonEditorPanel,
   logs: LogsPanel,
   portfolio: PortfolioPanel,

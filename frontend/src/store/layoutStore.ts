@@ -4,16 +4,25 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { clamp } from '@/lib/format';
 
-export type BottomTabId = 'editor' | 'logs' | 'portfolio' | 'positions' | 'strategy';
+export type BottomTabId =
+  | 'analysis'
+  | 'coach'
+  | 'editor'
+  | 'logs'
+  | 'portfolio'
+  | 'positions'
+  | 'strategy';
 export type DockedPanel = 'watchlist' | 'right' | 'bottom';
 export type Theme = 'dark' | 'light';
 
 export const BOTTOM_TABS: Array<{ id: BottomTabId; label: string; shortcut: string }> = [
-  { id: 'editor', label: 'Python Editor', shortcut: 'Alt+1' },
-  { id: 'logs', label: 'Logs', shortcut: 'Alt+2' },
-  { id: 'portfolio', label: 'Portfolio', shortcut: 'Alt+3' },
-  { id: 'positions', label: 'Positions', shortcut: 'Alt+4' },
-  { id: 'strategy', label: 'Strategy Output', shortcut: 'Alt+5' },
+  { id: 'analysis', label: 'Analysis', shortcut: 'Alt+1' },
+  { id: 'coach', label: 'Coach', shortcut: 'Alt+2' },
+  { id: 'editor', label: 'Python Editor', shortcut: 'Alt+3' },
+  { id: 'logs', label: 'Logs', shortcut: 'Alt+4' },
+  { id: 'portfolio', label: 'Portfolio', shortcut: 'Alt+5' },
+  { id: 'positions', label: 'Positions', shortcut: 'Alt+6' },
+  { id: 'strategy', label: 'Strategy Output', shortcut: 'Alt+7' },
 ];
 
 /** Chart column occupies 65% of the viewport by default. */
@@ -58,7 +67,7 @@ const defaults = {
   rightSplit: 0.55,
   bottomOpen: true,
   bottomHeight: DEFAULT_BOTTOM_HEIGHT,
-  bottomTab: 'editor' as BottomTabId,
+  bottomTab: 'analysis' as BottomTabId,
   maximized: null,
   commandOpen: false,
 };

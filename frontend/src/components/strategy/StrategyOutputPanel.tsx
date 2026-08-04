@@ -2,7 +2,7 @@
 
 import { motion } from 'framer-motion';
 import { useEffect } from 'react';
-import { money, num, pct } from '@/lib/format';
+import { money, num, pct, price } from '@/lib/format';
 import { useStrategyStore } from '@/store/strategyStore';
 
 function Stat({ label, value, tone }: { label: string; value: string; tone?: 'up' | 'down' }) {
@@ -58,9 +58,12 @@ export function StrategyOutputPanel() {
     void loadHistory();
   }, [loadHistory]);
 
+  // The engine writes `{date, equity}`; tolerate the older `value` shape too.
   const equity = (result?.equity_curve ?? [])
-    .map((point) => (typeof point === 'number' ? point : num(point?.value)))
+    .map((point) => (typeof point === 'number' ? point : num(point?.equity ?? point?.value)))
     .filter((value) => Number.isFinite(value) && value !== 0);
+
+  const fills = result?.trades_data ?? [];
 
   return (
     <div className="flex h-full gap-3 overflow-auto p-3">
@@ -82,6 +85,63 @@ export function StrategyOutputPanel() {
             <div className="mt-3 rounded border border-line bg-surface-2 p-2">
               <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">Equity curve</p>
               <EquityCurve points={equity} />
+            </div>
+
+            <div className="mt-3 rounded border border-line bg-surface-2 p-2">
+              <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">
+                Fills ({fills.length})
+              </p>
+              <div className="max-h-40 overflow-auto">
+                <table className="w-full text-[11px]">
+                  <thead className="sticky top-0 bg-surface-2 text-faint">
+                    <tr>
+                      <th className="px-1.5 py-1 text-left font-medium">Time</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Symbol</th>
+                      <th className="px-1.5 py-1 text-left font-medium">Side</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Qty</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Price</th>
+                      <th className="px-1.5 py-1 text-right font-medium">Value</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {fills
+                      .slice()
+                      .reverse()
+                      .slice(0, 100)
+                      .map((fill, index) => (
+                        <tr key={`${fill.timestamp}-${index}`} className="border-t border-line/40">
+                          <td className="tabular px-1.5 py-1 text-dim">
+                            {fill.timestamp ? String(fill.timestamp).slice(0, 10) : '—'}
+                          </td>
+                          <td className="px-1.5 py-1 text-dim">{fill.symbol ?? '—'}</td>
+                          <td
+                            className={`px-1.5 py-1 font-medium ${
+                              fill.side === 'SELL' ? 'text-down' : 'text-up'
+                            }`}
+                          >
+                            {fill.side ?? '—'}
+                          </td>
+                          <td className="tabular px-1.5 py-1 text-right text-dim">
+                            {num(fill.quantity)}
+                          </td>
+                          <td className="tabular px-1.5 py-1 text-right text-dim">
+                            {price(fill.price)}
+                          </td>
+                          <td className="tabular px-1.5 py-1 text-right text-dim">
+                            {money(fill.value)}
+                          </td>
+                        </tr>
+                      ))}
+                    {fills.length === 0 && (
+                      <tr>
+                        <td colSpan={6} className="py-2 text-center text-faint">
+                          strategy placed no orders
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </>
         ) : (

@@ -128,6 +128,23 @@ export interface BacktestRun {
   error_message?: string;
 }
 
+/** One fill recorded by `BacktestEngine` (services/backtesting_engine.py). */
+export interface BacktestTrade {
+  timestamp?: string;
+  symbol?: string;
+  side?: 'BUY' | 'SELL';
+  price?: number | string;
+  quantity?: number | string;
+  value?: number | string;
+}
+
+/** Equity samples are `{date, equity}`; older runs may carry `value`. */
+export interface EquityPoint {
+  date?: string;
+  equity?: number;
+  value?: number;
+}
+
 export interface BacktestResult {
   total_trades: number;
   winning_trades: number;
@@ -138,8 +155,8 @@ export interface BacktestResult {
   max_drawdown_percent: string | number;
   win_rate: string | number;
   profit_factor: string | number;
-  equity_curve: Array<{ date?: string; value?: number } | number>;
-  trades_data: unknown[];
+  equity_curve: Array<EquityPoint | number>;
+  trades_data: BacktestTrade[];
 }
 
 export type Timeframe = '1Min' | '5Min' | '15Min' | '1Hour' | '4Hour' | '1Day' | '1Week';
