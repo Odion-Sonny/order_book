@@ -31,8 +31,8 @@ import {
 import { log } from '@/store/logStore';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
-import { barsFor, useSymbolStore } from '@/store/symbolStore';
-import type { Candle } from '@/types';
+import { barsFor, useSymbolStore, type ChartType } from '@/store/symbolStore';
+import type { Candle, Timeframe } from '@/types';
 
 interface Palette {
   bg: string;
@@ -73,6 +73,21 @@ const OVERLAY_COLORS: Record<string, string> = {
 
 const asTime = (t: number) => t as UTCTimestamp;
 
+/** Push one bar into the main series, in whichever shape the series expects. */
+const applyBar = (series: ISeriesApi<SeriesType>, chartType: ChartType, bar: Candle) => {
+  if (chartType === 'candles' || chartType === 'bars') {
+    (series as ISeriesApi<'Candlestick'>).update({
+      time: asTime(bar.time),
+      open: bar.open,
+      high: bar.high,
+      low: bar.low,
+      close: bar.close,
+    });
+  } else {
+    (series as ISeriesApi<'Line'>).update({ time: asTime(bar.time), value: bar.close });
+  }
+};
+
 /**
  * Fetch older bars once the viewport comes within this many bars of the start
  * of the loaded history, so the data arrives before the user reaches the edge.
@@ -91,6 +106,20 @@ const MAX_FETCH_BARS = 5000;
 
 /** Empty bars kept to the right of the last candle, for breathing room. */
 const RIGHT_MARGIN_BARS = 4;
+
+/**
+ * Bar width in seconds, used to roll live ticks into a new candle once the
+ * current one closes. Daily and weekly bars are deliberately absent: their
+ * boundaries follow the venue's session calendar, not a fixed number of
+ * seconds, so those resolutions keep forming the last bar until the next fetch.
+ */
+const INTRADAY_SECONDS: Partial<Record<Timeframe, number>> = {
+  '1Min': 60,
+  '5Min': 5 * 60,
+  '15Min': 15 * 60,
+  '1Hour': 60 * 60,
+  '4Hour': 4 * 60 * 60,
+};
 
 export function ChartPanel() {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -126,6 +155,13 @@ export function ChartPanel() {
   const loadOlderRef = useRef<(() => Promise<void>) | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [hover, setHover] = useState<Candle | null>(null);
+  /**
+   * The bar being built from live ticks, once the clock has moved past the last
+   * bar the venue returned. Held in a ref so ticks accumulate a high and low,
+   * and mirrored into state so the OHLC header follows it.
+   */
+  const formingRef = useRef<Candle | null>(null);
+  const [forming, setForming] = useState<Candle | null>(null);
   /** Bumped whenever the chart is rebuilt so the drawing layer repaints. */
   const [revision, setRevision] = useState(0);
   /**
@@ -566,28 +602,79 @@ export function ChartPanel() {
     }
   }, [paneIndicators, candles]);
 
-  /* Live price ticks update the forming candle without a refetch. */
+  /* A new symbol or resolution invalidates whatever bar was being built. */
+  useEffect(() => {
+    formingRef.current = null;
+    setForming(null);
+  }, [symbol, timeframe]);
+
+  /* Drop the local bar once the venue returns a real one that covers it. */
+  useEffect(() => {
+    const last = candles[candles.length - 1];
+    if (last && formingRef.current && last.time >= formingRef.current.time) {
+      formingRef.current = null;
+      setForming(null);
+    }
+  }, [candles]);
+
+  /*
+   * Live price ticks build the current bar without a refetch. While the clock
+   * is still inside the last bar the venue returned, ticks extend that bar;
+   * once it closes they open the next one, so the chart keeps advancing
+   * between fetches instead of piling every trade onto one candle.
+   */
   useEffect(() => {
     const series = mainSeriesRef.current;
     if (!series || !livePrice || candles.length === 0) return;
     const lastCandle = candles[candles.length - 1];
 
-    if (chartType === 'candles' || chartType === 'bars') {
-      (series as ISeriesApi<'Candlestick'>).update({
-        time: asTime(lastCandle.time),
+    const barSeconds = INTRADAY_SECONDS[timeframe];
+    const now = Date.now() / 1000;
+    /*
+     * Anchor the grid to the last bar the venue sent rather than to the epoch,
+     * so the boundaries line up with however the venue aligns its bars.
+     */
+    const elapsed = barSeconds ? Math.floor((now - lastCandle.time) / barSeconds) : 0;
+
+    if (!barSeconds || elapsed < 1) {
+      // Still inside the venue's last bar: extend it.
+      if (formingRef.current) {
+        formingRef.current = null;
+        setForming(null);
+      }
+      const bar: Candle = {
+        time: lastCandle.time,
         open: lastCandle.open,
         high: Math.max(lastCandle.high, livePrice),
         low: Math.min(lastCandle.low, livePrice),
         close: livePrice,
-      });
-    } else {
-      (series as ISeriesApi<'Line'>).update({ time: asTime(lastCandle.time), value: livePrice });
+        volume: lastCandle.volume,
+      };
+      applyBar(series, chartType, bar);
+      return;
     }
-  }, [livePrice, candles, chartType]);
+
+    // The venue's last bar has closed; build the one the clock is now in.
+    const barTime = lastCandle.time + elapsed * barSeconds;
+    const current = formingRef.current;
+    const bar: Candle =
+      current && current.time === barTime
+        ? {
+            ...current,
+            high: Math.max(current.high, livePrice),
+            low: Math.min(current.low, livePrice),
+            close: livePrice,
+          }
+        : { time: barTime, open: livePrice, high: livePrice, low: livePrice, close: livePrice, volume: 0 };
+
+    formingRef.current = bar;
+    setForming(bar);
+    applyBar(series, chartType, bar);
+  }, [livePrice, candles, chartType, timeframe]);
 
   /* --------------------------------------------------------------- view */
 
-  const shown = hover ?? candles[candles.length - 1] ?? null;
+  const shown = hover ?? forming ?? candles[candles.length - 1] ?? null;
   const bullish = shown ? shown.close >= shown.open : true;
 
   /* Indicator values at the bar under the crosshair, for the legend. */

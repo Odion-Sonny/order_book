@@ -34,3 +34,4 @@ docs/FRONTEND.md
 # Local run logs
 .logs/
 dump.rdb
+.claude/
