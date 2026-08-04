@@ -136,6 +136,7 @@ export function ChartPanel() {
   const theme = useLayoutStore((s) => s.theme);
   const { symbol, timeframe, range, chartType, indicators } = useSymbolStore();
   const livePrice = useMarketStore((s) => s.lastPrice[symbol]);
+  const setSeries = useMarketStore((s) => s.setSeries);
 
   const [candles, setCandles] = useState<Candle[]>([]);
   const [loading, setLoading] = useState(false);
@@ -616,6 +617,16 @@ export function ChartPanel() {
       setForming(null);
     }
   }, [candles]);
+
+  /*
+   * Republish the loaded window, with the bar in progress on the end, so the
+   * Analysis and Coach tabs read exactly what is on screen.
+   */
+  useEffect(() => {
+    const last = candles[candles.length - 1];
+    const live = forming && (!last || forming.time > last.time) ? [...candles, forming] : candles;
+    setSeries({ symbol, timeframe, candles: live });
+  }, [candles, forming, symbol, timeframe, setSeries]);
 
   /*
    * Live price ticks build the current bar without a refetch. While the clock

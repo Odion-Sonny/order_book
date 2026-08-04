@@ -68,6 +68,32 @@ export const rsi = (candles: Candle[], period = 14): LinePoint[] => {
   return out;
 };
 
+/** Wilder-smoothed Average True Range — the stop-distance unit. */
+export const atr = (candles: Candle[], period = 14): LinePoint[] => {
+  if (candles.length <= period) return [];
+  const trueRanges: number[] = [];
+  for (let i = 1; i < candles.length; i++) {
+    const c = candles[i];
+    const prevClose = candles[i - 1].close;
+    trueRanges.push(
+      Math.max(c.high - c.low, Math.abs(c.high - prevClose), Math.abs(c.low - prevClose)),
+    );
+  }
+
+  const out: LinePoint[] = [];
+  let value = trueRanges.slice(0, period).reduce((a, b) => a + b, 0) / period;
+  out.push({ time: candles[period].time, value });
+  for (let i = period; i < trueRanges.length; i++) {
+    value = (value * (period - 1) + trueRanges[i]) / period;
+    out.push({ time: candles[i + 1].time, value });
+  }
+  return out;
+};
+
+/** Last value of a series, or `null` when the window is too short to have one. */
+export const lastValue = (points: LinePoint[]): number | null =>
+  points.length > 0 ? points[points.length - 1].value : null;
+
 export interface BollingerBands {
   upper: LinePoint[];
   middle: LinePoint[];

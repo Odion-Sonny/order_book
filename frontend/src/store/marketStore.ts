@@ -16,14 +16,26 @@ export interface TapePrint {
 
 const MAX_TAPE = 200;
 
+/**
+ * The bars the chart currently holds, republished so the analysis and coach
+ * panels read the same window the user is looking at instead of refetching it.
+ */
+export interface ChartSeries {
+  symbol: string;
+  timeframe: string;
+  candles: Candle[];
+}
+
 interface MarketState {
   snapshots: Record<string, MarketSnapshot>;
   orderBook: OrderBookData | null;
   tape: TapePrint[];
   lastPrice: Record<string, number>;
+  series: ChartSeries | null;
   loadingSnapshots: boolean;
   error: string | null;
 
+  setSeries: (series: ChartSeries) => void;
   loadSnapshots: () => Promise<void>;
   setOrderBook: (book: OrderBookData) => void;
   addPrint: (print: Omit<TapePrint, 'id' | 'side'> & { side?: TapePrint['side'] }) => void;
@@ -38,8 +50,11 @@ export const useMarketStore = create<MarketState>((set, get) => ({
   orderBook: null,
   tape: [],
   lastPrice: {},
+  series: null,
   loadingSnapshots: false,
   error: null,
+
+  setSeries: (series) => set({ series }),
 
   loadSnapshots: async () => {
     set({ loadingSnapshots: true, error: null });
