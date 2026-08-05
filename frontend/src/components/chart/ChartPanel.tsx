@@ -71,6 +71,16 @@ const OVERLAY_COLORS: Record<string, string> = {
   bollingerLower: '#787b86',
 };
 
+/** Short labels for the overlay toggles that sit on the chart itself. */
+const QUICK_INDICATORS: Array<{ id: IndicatorId; label: string }> = [
+  { id: 'sma20', label: 'SMA' },
+  { id: 'ema20', label: 'EMA' },
+  { id: 'bollinger', label: 'BB' },
+  { id: 'vwap', label: 'VWAP' },
+  { id: 'rsi', label: 'RSI' },
+  { id: 'macd', label: 'MACD' },
+];
+
 const asTime = (t: number) => t as UTCTimestamp;
 
 /** Push one bar into the main series, in whichever shape the series expects. */
@@ -132,9 +142,18 @@ export function ChartPanel() {
   const paneRefs = useRef<Map<string, ISeriesApi<'Line' | 'Histogram'>>>(new Map());
   /** time -> candle, for the crosshair legend. */
   const candleIndexRef = useRef<Map<number, Candle>>(new Map());
+  /**
+   * Newest bar time the price series holds. `update()` throws if handed a time
+   * older than this, which happens for a beat after a timeframe switch: the
+   * effect still sees the previous resolution's candles while the fetch for the
+   * new one is in flight.
+   */
+  const seriesEndRef = useRef(0);
 
   const theme = useLayoutStore((s) => s.theme);
-  const { symbol, timeframe, range, chartType, indicators } = useSymbolStore();
+  const bottomOpen = useLayoutStore((s) => s.bottomOpen);
+  const toggleDock = useLayoutStore((s) => s.toggleDock);
+  const { symbol, timeframe, range, chartType, indicators, toggleIndicator } = useSymbolStore();
   const livePrice = useMarketStore((s) => s.lastPrice[symbol]);
   const setSeries = useMarketStore((s) => s.setSeries);
 
@@ -466,6 +485,7 @@ export function ChartPanel() {
 
     candleIndexRef.current = new Map(candles.map((c) => [c.time, c]));
     candlesRef.current = candles;
+    seriesEndRef.current = candles[candles.length - 1].time;
 
     if (shiftRef.current > 0) {
       // Older bars were prepended: every logical index moved right by that many,
@@ -639,6 +659,13 @@ export function ChartPanel() {
     if (!series || !livePrice || candles.length === 0) return;
     const lastCandle = candles[candles.length - 1];
 
+    /** Never rewind the series — lightweight-charts rejects an older time. */
+    const push = (bar: Candle) => {
+      if (bar.time < seriesEndRef.current) return;
+      applyBar(series, chartType, bar);
+      seriesEndRef.current = bar.time;
+    };
+
     const barSeconds = INTRADAY_SECONDS[timeframe];
     const now = Date.now() / 1000;
     /*
@@ -661,7 +688,7 @@ export function ChartPanel() {
         close: livePrice,
         volume: lastCandle.volume,
       };
-      applyBar(series, chartType, bar);
+      push(bar);
       return;
     }
 
@@ -680,7 +707,7 @@ export function ChartPanel() {
 
     formingRef.current = bar;
     setForming(bar);
-    applyBar(series, chartType, bar);
+    push(bar);
   }, [livePrice, candles, chartType, timeframe]);
 
   /* --------------------------------------------------------------- view */
@@ -737,11 +764,37 @@ export function ChartPanel() {
           ))}
       </div>
 
-      {(loading || loadingMore) && (
-        <div className="absolute right-3 top-2 z-10 text-[11px] text-faint">
-          {loadingMore ? 'loading history…' : 'loading…'}
-        </div>
-      )}
+      {/* Quick indicator toggles, over the chart where the eye already is. */}
+      <div className="absolute right-3 top-2 z-20 flex items-center gap-1 rounded border border-line bg-surface/90 px-1 py-0.5 backdrop-blur-sm">
+        {(loading || loadingMore) && (
+          <span className="px-1 text-[10px] text-faint">
+            {loadingMore ? 'loading history…' : 'loading…'}
+          </span>
+        )}
+        {QUICK_INDICATORS.map(({ id, label }) => (
+          <button
+            key={id}
+            type="button"
+            onClick={() => toggleIndicator(id)}
+            aria-pressed={indicators.includes(id)}
+            title={INDICATOR_LABELS[id]}
+            className={`rounded px-1.5 py-0.5 text-[10px] font-medium transition-colors ${
+              indicators.includes(id) ? 'text-accent' : 'text-faint hover:text-dim'
+            }`}
+          >
+            {label}
+          </button>
+        ))}
+        <span className="mx-0.5 h-3 w-px bg-line" />
+        <button
+          type="button"
+          onClick={() => toggleDock('bottom')}
+          className="px-1.5 py-0.5 text-[10px] text-faint transition-colors hover:text-fg"
+        >
+          {bottomOpen ? 'Hide panel' : 'Show panel'}
+        </button>
+      </div>
+
       {error && !loading && (
         <div className="absolute inset-x-0 top-1/2 z-10 -translate-y-1/2 text-center text-xs text-down">
           {error}

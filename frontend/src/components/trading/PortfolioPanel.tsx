@@ -22,7 +22,8 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: '
   );
 }
 
-export function PortfolioPanel() {
+/** `showTicket` is off in the market column, where the ticket is its own tab. */
+export function PortfolioPanel({ showTicket = true }: { showTicket?: boolean }) {
   const { portfolio, positions, orders, loading, refresh } = useTradingStore();
   const authenticated = useAuthStore((s) => s.authenticated);
   const setModalOpen = useAuthStore((s) => s.setModalOpen);
@@ -71,7 +72,7 @@ export function PortfolioPanel() {
           )}
         </div>
 
-        <div className="grid grid-cols-2 gap-2 lg:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-4">
           <Metric label="Equity" value={money(equity)} />
           <Metric label="Cash" value={money(cash)} />
           <Metric label="Market value" value={money(marketValue)} />
@@ -87,7 +88,11 @@ export function PortfolioPanel() {
         </div>
       </div>
 
-      <OrderTicket />
+      {showTicket && (
+        <div className="w-72 shrink-0">
+          <OrderTicket />
+        </div>
+      )}
     </div>
   );
 }

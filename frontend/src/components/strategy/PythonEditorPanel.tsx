@@ -8,7 +8,6 @@ import { useSymbolStore } from '@/store/symbolStore';
 
 export function PythonEditorPanel() {
   const theme = useLayoutStore((s) => s.theme);
-  const setBottomTab = useLayoutStore((s) => s.setBottomTab);
   const symbol = useSymbolStore((s) => s.symbol);
   const {
     code,
@@ -24,13 +23,11 @@ export function PythonEditorPanel() {
     runBacktest,
   } = useStrategyStore();
 
-  const start = () => {
-    setBottomTab('strategy');
-    void runBacktest();
-  };
+  // Results render in the column beside this one, so nothing to switch to.
+  const start = () => void runBacktest();
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="flex h-full min-h-0 flex-col">
       <div className="flex shrink-0 flex-wrap items-center gap-2 border-b border-line px-2 py-1.5">
         <input
           value={name}

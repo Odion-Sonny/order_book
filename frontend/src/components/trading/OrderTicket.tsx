@@ -40,7 +40,7 @@ export function OrderTicket() {
   };
 
   return (
-    <div className="flex w-full max-w-xs flex-col gap-2 rounded border border-line bg-surface-2 p-2.5">
+    <div className="flex w-full flex-col gap-2 rounded border border-line bg-surface-2 p-2.5">
       <div className="flex items-center justify-between">
         <span className="text-[11px] font-semibold uppercase tracking-wider text-dim">
           Paper Trade

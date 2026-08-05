@@ -53,7 +53,11 @@ function Ladder({
   );
 }
 
-export function OrderBookPanel() {
+/**
+ * `embedded` drops the panel chrome: inside the market column the tab strip
+ * above already names the feed and carries the maximize control.
+ */
+export function OrderBookPanel({ embedded = false }: { embedded?: boolean }) {
   const symbol = useSymbolStore((s) => s.symbol);
   const orderBook = useMarketStore((s) => s.orderBook);
   const setOrderBook = useMarketStore((s) => s.setOrderBook);
@@ -123,14 +127,8 @@ export function OrderBookPanel() {
     lastRef.current = last;
   }, [last]);
 
-  return (
-    <Panel
-      title="Order Book"
-      subtitle={`L1 · ${symbol}`}
-      maximized={maximized === 'right'}
-      onMaximize={() => toggleMaximized('right')}
-      bodyClassName="flex flex-col"
-    >
+  const body = (
+    <>
       <div className="grid shrink-0 grid-cols-[1fr_1fr_1fr] border-b border-line px-2 py-1 text-[10px] uppercase tracking-wide text-faint">
         <span>Price</span>
         <span className="text-right">Size</span>
@@ -176,6 +174,20 @@ export function OrderBookPanel() {
           <div className="flex-1 bg-down" />
         </div>
       </div>
+    </>
+  );
+
+  if (embedded) return <div className="flex h-full min-h-0 flex-col">{body}</div>;
+
+  return (
+    <Panel
+      title="Order Book"
+      subtitle={`L1 · ${symbol}`}
+      maximized={maximized === 'right'}
+      onMaximize={() => toggleMaximized('right')}
+      bodyClassName="flex flex-col"
+    >
+      {body}
     </Panel>
   );
 }

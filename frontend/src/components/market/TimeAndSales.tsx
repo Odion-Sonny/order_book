@@ -12,7 +12,8 @@ import { useSymbolStore } from '@/store/symbolStore';
 /** A print this size or larger is highlighted as block activity. */
 const BLOCK_SIZE = 500;
 
-export function TimeAndSales() {
+/** See `OrderBookPanel` — `embedded` drops the chrome for the market column. */
+export function TimeAndSales({ embedded = false }: { embedded?: boolean }) {
   const symbol = useSymbolStore((s) => s.symbol);
   const tape = useMarketStore((s) => s.tape);
   const addPrint = useMarketStore((s) => s.addPrint);
@@ -44,22 +45,8 @@ export function TimeAndSales() {
 
   const rows = tape.filter((print) => print.ticker === symbol);
 
-  return (
-    <Panel
-      title="Time & Sales"
-      subtitle={symbol}
-      actions={
-        <button
-          type="button"
-          onClick={clearTape}
-          aria-label="Clear tape"
-          className="rounded p-1 text-faint transition-colors hover:bg-surface-3 hover:text-fg"
-        >
-          <Trash2 size={12} />
-        </button>
-      }
-      bodyClassName="flex flex-col"
-    >
+  const body = (
+    <>
       <div className="grid shrink-0 grid-cols-[1fr_1fr_1fr] border-b border-line px-2 py-1 text-[10px] uppercase tracking-wide text-faint">
         <span>Time</span>
         <span className="text-right">Price</span>
@@ -101,6 +88,28 @@ export function TimeAndSales() {
           </li>
         )}
       </ul>
+    </>
+  );
+
+  if (embedded) return <div className="flex h-full min-h-0 flex-col">{body}</div>;
+
+  return (
+    <Panel
+      title="Time & Sales"
+      subtitle={symbol}
+      actions={
+        <button
+          type="button"
+          onClick={clearTape}
+          aria-label="Clear tape"
+          className="rounded p-1 text-faint transition-colors hover:bg-surface-3 hover:text-fg"
+        >
+          <Trash2 size={12} />
+        </button>
+      }
+      bodyClassName="flex flex-col"
+    >
+      {body}
     </Panel>
   );
 }

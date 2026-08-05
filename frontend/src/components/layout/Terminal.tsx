@@ -6,19 +6,20 @@ import { ChartPanel } from '@/components/chart/ChartPanel';
 import { BottomDock } from '@/components/layout/BottomDock';
 import { TopBar } from '@/components/layout/TopBar';
 import { WatchlistSidebar } from '@/components/layout/WatchlistSidebar';
-import { OrderBookPanel } from '@/components/market/OrderBookPanel';
-import { TimeAndSales } from '@/components/market/TimeAndSales';
+import { MarketFeedPanel } from '@/components/market/MarketFeedPanel';
+import { TradePanel } from '@/components/trading/TradePanel';
 import { CommandPalette } from '@/components/ui/CommandPalette';
 import { LoginModal } from '@/components/ui/LoginModal';
 import { ResizeHandle } from '@/components/ui/ResizeHandle';
 import { useKeyboardShortcuts } from '@/hooks/useKeyboardShortcuts';
 import { useStream } from '@/hooks/useStream';
-import { clamp } from '@/lib/format';
+import { clamp, money, num } from '@/lib/format';
 import { useAuthStore } from '@/store/authStore';
 import { log } from '@/store/logStore';
 import { useLayoutStore } from '@/store/layoutStore';
 import { useMarketStore } from '@/store/marketStore';
 import { useSymbolStore } from '@/store/symbolStore';
+import { useTradingStore } from '@/store/tradingStore';
 
 /** Market snapshot refresh cadence while the socket carries ticks. */
 const SNAPSHOT_POLL_MS = 30_000;
@@ -44,6 +45,9 @@ interface StreamTrade {
 export function Terminal() {
   const layout = useLayoutStore();
   const symbol = useSymbolStore((s) => s.symbol);
+  const timeframe = useSymbolStore((s) => s.timeframe);
+  const series = useMarketStore((s) => s.series);
+  const cash = useTradingStore((s) => num(s.portfolio?.cash_balance));
   const loadSnapshots = useMarketStore((s) => s.loadSnapshots);
   const addPrint = useMarketStore((s) => s.addPrint);
   const applyBar = useMarketStore((s) => s.applyBar);
@@ -185,12 +189,12 @@ export function Terminal() {
                     className="min-h-0 overflow-hidden"
                     style={{ flex: `${layout.rightSplit} 1 0%` }}
                   >
-                    <OrderBookPanel />
+                    <MarketFeedPanel />
                   </div>
 
                   <ResizeHandle
                     orientation="horizontal"
-                    aria-label="Resize order book and tape"
+                    aria-label="Resize market feed and trade panel"
                     onResize={(delta) => {
                       const height = window.innerHeight - 44;
                       layout.setRightSplit(layout.rightSplit + delta / height);
@@ -198,10 +202,10 @@ export function Terminal() {
                   />
 
                   <div
-                    className="min-h-0 overflow-hidden"
+                    className="min-h-0 overflow-hidden border-t border-line"
                     style={{ flex: `${1 - layout.rightSplit} 1 0%` }}
                   >
-                    <TimeAndSales />
+                    <TradePanel />
                   </div>
                 </motion.div>
               )}
@@ -237,11 +241,27 @@ export function Terminal() {
         </div>
       </div>
 
-      <footer className="flex h-6 shrink-0 items-center gap-3 border-t border-line bg-surface px-2 text-[10px] text-faint">
-        <span>{symbol}</span>
-        <span>stream: {streamStatus}</span>
+      <footer className="flex h-6 shrink-0 items-center gap-4 border-t border-line bg-surface px-3 text-[10px] text-faint">
+        <span className="flex items-center gap-1.5">
+          <span
+            className={`h-1.5 w-1.5 rounded-full ${
+              streamStatus === 'open'
+                ? 'animate-pulse bg-up'
+                : streamStatus === 'connecting'
+                  ? 'bg-warn'
+                  : 'bg-down'
+            }`}
+          />
+          {streamStatus === 'open' ? 'Live market data' : `Stream ${streamStatus}`}
+        </span>
+        <span className="hidden sm:inline">
+          {symbol} · {timeframe} · {series?.symbol === symbol ? series.candles.length : 0} bars
+        </span>
+        {cash > 0 && <span className="tabular hidden md:inline">Cash {money(cash, 0)}</span>}
         <div className="flex-1" />
-        <span>Ctrl K search · Ctrl B/I/J panels · F chart · Ctrl Shift R reset layout</span>
+        <span className="hidden lg:inline">
+          Ctrl K search · Ctrl B/I/J panels · Alt 1-4 tabs · F chart · Ctrl Shift R reset layout
+        </span>
       </footer>
 
       <CommandPalette />

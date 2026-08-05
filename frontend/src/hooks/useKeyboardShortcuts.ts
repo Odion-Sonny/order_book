@@ -19,9 +19,9 @@ const DRAWING_KEYS: Record<string, ToolId> = {
 export const SHORTCUTS: Array<{ keys: string; action: string }> = [
   { keys: 'Ctrl K  /  /', action: 'Symbol search' },
   { keys: 'Ctrl B', action: 'Toggle watchlist' },
-  { keys: 'Ctrl I', action: 'Toggle order book column' },
+  { keys: 'Ctrl I', action: 'Toggle market column' },
   { keys: 'Ctrl J', action: 'Toggle bottom dock' },
-  { keys: 'Alt 1-7', action: 'Bottom dock tabs' },
+  { keys: 'Alt 1-4', action: 'Bottom dock tabs' },
   { keys: 'Shift 1-7', action: 'Timeframe' },
   { keys: 'F', action: 'Maximize chart' },
   { keys: 'T / H / R', action: 'Trend line / horizontal / rectangle' },
@@ -99,7 +99,7 @@ export function useKeyboardShortcuts(): void {
         }
       }
 
-      if (event.altKey && /^[1-7]$/.test(event.key)) {
+      if (event.altKey && /^[1-4]$/.test(event.key)) {
         event.preventDefault();
         layout.setBottomTab(BOTTOM_TABS[Number(event.key) - 1].id);
         return;

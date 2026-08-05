@@ -66,8 +66,18 @@ export function StrategyOutputPanel() {
   const fills = result?.trades_data ?? [];
 
   return (
-    <div className="flex h-full gap-3 overflow-auto p-3">
-      <div className="min-w-0 flex-1">
+    <div className="flex h-full min-h-0 flex-col">
+      <header className="flex h-9 shrink-0 items-center gap-2 border-b border-line px-3">
+        <span className="text-[11px] font-semibold text-faint">Results</span>
+        {run && (
+          <span className="truncate text-[10px] text-faint">
+            run #{run.id} · {run.name}
+          </span>
+        )}
+        {running && <span className="animate-pulse text-[10px] text-warn">running…</span>}
+      </header>
+
+      <div className="min-h-0 flex-1 overflow-auto p-3">
         {result ? (
           <>
             <div className="grid grid-cols-2 gap-2 md:grid-cols-4 xl:grid-cols-6">
@@ -145,52 +155,50 @@ export function StrategyOutputPanel() {
             </div>
           </>
         ) : (
-          <div className="flex h-full items-center justify-center text-center text-[11px] text-faint">
-            {running
-              ? 'Running backtest…'
-              : 'Run a strategy from the Python Editor tab to see performance here.'}
+          <div className="flex h-24 items-center justify-center text-center text-[11px] text-faint">
+            {running ? 'Running backtest…' : 'Run the strategy on the left to see performance here.'}
           </div>
         )}
-      </div>
 
-      <div className="flex w-72 shrink-0 flex-col gap-2">
-        <div className="rounded border border-line bg-surface-2 p-2">
-          <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">Console</p>
-          <div className="tabular max-h-32 overflow-auto text-[11px] leading-relaxed text-dim">
-            {output.length === 0 ? (
-              <span className="text-faint">no output</span>
-            ) : (
-              output.map((line, index) => <div key={`${index}-${line.slice(0, 12)}`}>{line}</div>)
-            )}
+        <div className="mt-3 grid gap-2 md:grid-cols-2">
+          <div className="rounded border border-line bg-surface-2 p-2">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">Console</p>
+            <div className="tabular max-h-32 overflow-auto text-[11px] leading-relaxed text-dim">
+              {output.length === 0 ? (
+                <span className="text-faint">no output</span>
+              ) : (
+                output.map((line, index) => <div key={`${index}-${line.slice(0, 12)}`}>{line}</div>)
+              )}
+            </div>
           </div>
-        </div>
 
-        <div className="min-h-0 flex-1 rounded border border-line bg-surface-2 p-2">
-          <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">Recent runs</p>
-          <ul className="max-h-40 overflow-auto text-[11px]">
-            {history.slice(0, 12).map((entry) => (
-              <li
-                key={entry.id}
-                className={`flex justify-between border-b border-line/40 py-1 ${
-                  run?.id === entry.id ? 'text-fg' : 'text-dim'
-                }`}
-              >
-                <span className="truncate">{entry.name}</span>
-                <span
-                  className={
-                    entry.status === 'COMPLETED'
-                      ? 'text-up'
-                      : entry.status === 'FAILED'
-                        ? 'text-down'
-                        : 'text-warn'
-                  }
+          <div className="rounded border border-line bg-surface-2 p-2">
+            <p className="mb-1 text-[10px] uppercase tracking-wide text-faint">Recent runs</p>
+            <ul className="max-h-32 overflow-auto text-[11px]">
+              {history.slice(0, 12).map((entry) => (
+                <li
+                  key={entry.id}
+                  className={`flex justify-between border-b border-line/40 py-1 ${
+                    run?.id === entry.id ? 'text-fg' : 'text-dim'
+                  }`}
                 >
-                  {entry.status}
-                </span>
-              </li>
-            ))}
-            {history.length === 0 && <li className="py-2 text-faint">no runs yet</li>}
-          </ul>
+                  <span className="truncate">{entry.name}</span>
+                  <span
+                    className={
+                      entry.status === 'COMPLETED'
+                        ? 'text-up'
+                        : entry.status === 'FAILED'
+                          ? 'text-down'
+                          : 'text-warn'
+                    }
+                  >
+                    {entry.status}
+                  </span>
+                </li>
+              ))}
+              {history.length === 0 && <li className="py-2 text-faint">no runs yet</li>}
+            </ul>
+          </div>
         </div>
       </div>
     </div>

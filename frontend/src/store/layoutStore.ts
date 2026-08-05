@@ -4,25 +4,17 @@ import { create } from 'zustand';
 import { createJSONStorage, persist } from 'zustand/middleware';
 import { clamp } from '@/lib/format';
 
-export type BottomTabId =
-  | 'analysis'
-  | 'coach'
-  | 'editor'
-  | 'logs'
-  | 'portfolio'
-  | 'positions'
-  | 'strategy';
+export type BottomTabId = 'analysis' | 'backtest' | 'coach' | 'logs';
+export type RightTabId = 'orderbook' | 'tape';
+export type TradeTabId = 'ticket' | 'positions' | 'account';
 export type DockedPanel = 'watchlist' | 'right' | 'bottom';
 export type Theme = 'dark' | 'light';
 
 export const BOTTOM_TABS: Array<{ id: BottomTabId; label: string; shortcut: string }> = [
   { id: 'analysis', label: 'Analysis', shortcut: 'Alt+1' },
-  { id: 'coach', label: 'Coach', shortcut: 'Alt+2' },
-  { id: 'editor', label: 'Python Editor', shortcut: 'Alt+3' },
+  { id: 'backtest', label: 'Backtest', shortcut: 'Alt+2' },
+  { id: 'coach', label: 'AI Coach', shortcut: 'Alt+3' },
   { id: 'logs', label: 'Logs', shortcut: 'Alt+4' },
-  { id: 'portfolio', label: 'Portfolio', shortcut: 'Alt+5' },
-  { id: 'positions', label: 'Positions', shortcut: 'Alt+6' },
-  { id: 'strategy', label: 'Strategy Output', shortcut: 'Alt+7' },
 ];
 
 /** Chart column occupies 65% of the viewport by default. */
@@ -41,6 +33,10 @@ interface LayoutState {
   bottomOpen: boolean;
   bottomHeight: number;
   bottomTab: BottomTabId;
+  /** Which feed the top of the market column shows. */
+  rightTab: RightTabId;
+  /** Which view the trade panel under it shows. */
+  tradeTab: TradeTabId;
   /** When set, that panel fills the workspace. */
   maximized: DockedPanel | 'chart' | null;
   commandOpen: boolean;
@@ -53,6 +49,8 @@ interface LayoutState {
   setRightSplit: (split: number) => void;
   setBottomHeight: (height: number) => void;
   setBottomTab: (tab: BottomTabId) => void;
+  setRightTab: (tab: RightTabId) => void;
+  setTradeTab: (tab: TradeTabId) => void;
   toggleMaximized: (panel: DockedPanel | 'chart') => void;
   setCommandOpen: (open: boolean) => void;
   resetLayout: () => void;
@@ -68,6 +66,8 @@ const defaults = {
   bottomOpen: true,
   bottomHeight: DEFAULT_BOTTOM_HEIGHT,
   bottomTab: 'analysis' as BottomTabId,
+  rightTab: 'orderbook' as RightTabId,
+  tradeTab: 'ticket' as TradeTabId,
   maximized: null,
   commandOpen: false,
 };
@@ -92,6 +92,8 @@ export const useLayoutStore = create<LayoutState>()(
       setRightSplit: (split) => set({ rightSplit: clamp(split, 0.2, 0.85) }),
       setBottomHeight: (height) => set({ bottomHeight: clamp(height, 140, 720) }),
       setBottomTab: (tab) => set({ bottomTab: tab, bottomOpen: true }),
+      setRightTab: (tab) => set({ rightTab: tab }),
+      setTradeTab: (tab) => set({ tradeTab: tab }),
 
       toggleMaximized: (panel) => set((s) => ({ maximized: s.maximized === panel ? null : panel })),
       setCommandOpen: (open) => set({ commandOpen: open }),
@@ -101,6 +103,19 @@ export const useLayoutStore = create<LayoutState>()(
     {
       name: 'te.layout',
       storage: createJSONStorage(() => localStorage),
+      version: 2,
+      /**
+       * v1 had a tab per panel (editor, portfolio, positions, strategy). Those
+       * moved into the Backtest split view and the market column, so a stored
+       * id can now name a panel that no longer exists.
+       */
+      migrate: (state) => {
+        const s = state as LayoutState;
+        if (s && !BOTTOM_TABS.some((tab) => tab.id === s.bottomTab)) {
+          s.bottomTab = defaults.bottomTab;
+        }
+        return s;
+      },
       partialize: ({ commandOpen: _commandOpen, maximized: _maximized, ...rest }) => rest,
     },
   ),
